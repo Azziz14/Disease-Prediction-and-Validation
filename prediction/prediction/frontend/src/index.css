@@ -1,0 +1,178 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --neon-purple: #b05bff;
+    --neon-green: #39ff14;
+    --neon-blue: #00f3ff;
+    --cyber-dark: #090a0f;
+    --cyber-glass: rgba(16, 18, 27, 0.6);
+    --cyber-border: rgba(0, 243, 255, 0.2);
+    --cyber-border-hover: rgba(0, 243, 255, 0.6);
+  }
+
+  body {
+    font-family: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    @apply text-white;
+    background: transparent;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', sans-serif;
+    @apply text-white;
+  }
+
+  ::selection {
+    background-color: var(--neon-purple);
+    color: white;
+  }
+}
+
+/* Cyberpunk Glassmorphism */
+.glass-panel {
+  background: var(--cyber-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--cyber-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 0 20px rgba(0, 243, 255, 0.05);
+  border-radius: 20px;
+  transition: all 0.4s ease;
+}
+
+.glass-panel:hover {
+  border-color: var(--cyber-border-hover);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 0 20px rgba(0, 243, 255, 0.15), 0 0 15px rgba(0, 243, 255, 0.3);
+}
+
+.glass-input {
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  transition: all 0.3s ease;
+}
+
+.glass-input:focus {
+  border-color: var(--neon-blue);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+  outline: none;
+}
+
+/* Neon Glow Texts */
+.neon-text-blue {
+  text-shadow: 0 0 10px rgba(0, 243, 255, 0.8), 0 0 20px rgba(0, 243, 255, 0.4);
+}
+.neon-text-green {
+  text-shadow: 0 0 10px rgba(57, 255, 20, 0.8), 0 0 20px rgba(57, 255, 20, 0.4);
+}
+.neon-text-purple {
+  text-shadow: 0 0 10px rgba(176, 91, 255, 0.8), 0 0 20px rgba(176, 91, 255, 0.4);
+}
+
+/* Glowing Border Wrap for interactive elements */
+.glowing-wrap {
+  position: relative;
+  transition: box-shadow 0.5s ease;
+}
+.glowing-wrap:hover {
+  box-shadow: 
+    0 0 20px rgba(0, 243, 255, 0.3),
+    0 0 40px rgba(176, 91, 255, 0.2),
+    0 0 60px rgba(57, 255, 20, 0.1),
+    inset 0 0 30px rgba(0, 243, 255, 0.05);
+}
+
+/* Animated Neural Progress path */
+.neural-neon-path {
+  stroke: var(--neon-blue);
+  stroke-width: 3;
+  fill: none;
+  filter: drop-shadow(0 0 8px var(--neon-blue));
+  stroke-dasharray: 200;
+  animation: dashLoop 3s linear infinite;
+}
+
+@keyframes dashLoop {
+  to { stroke-dashoffset: -400; }
+}
+
+/* Gravity tracking wrapper (used from JS logic) */
+.gravity-tracker {
+  transition: transform 0.1s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+/* ===== Smooth scrolling ===== */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ===== Scrollbar (Dark theme) ===== */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 243, 255, 0.15);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 243, 255, 0.35);
+}
+
+/* ===== Global smooth transitions ===== */
+.interactive-element, button, a, input, select, textarea, .glass-panel {
+  transition-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+/* ===== Utility animations ===== */
+@layer utilities {
+  .animate-in {
+    animation-fill-mode: both;
+  }
+  .fade-in {
+    animation: fadeIn 0.6s ease-out forwards;
+  }
+  .slide-in-from-bottom-4 {
+    animation: slideUp 0.5s ease-out forwards;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Neon pulse animation ===== */
+@keyframes neonPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(0, 243, 255, 0.3); }
+  50% { box-shadow: 0 0 25px rgba(0, 243, 255, 0.6), 0 0 50px rgba(0, 243, 255, 0.2); }
+}
+
+.neon-pulse {
+  animation: neonPulse 3s ease-in-out infinite;
+}
+
+/* ===== Input number spinner hide ===== */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}

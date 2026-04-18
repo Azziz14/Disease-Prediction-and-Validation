@@ -1,0 +1,277 @@
+{
+  "disease": "diabetes",
+  "version": "3.0_enhanced",
+  "best_ml_model": "rf",
+  "ml_accuracies": {
+    "xgb": 0.75,
+    "rf": 0.7672413793103449,
+    "svm": 0.7586206896551724,
+    "lr": 0.7586206896551724,
+    "gb": 0.7672413793103449,
+    "lgbm": 0.7672413793103449
+  },
+  "ml_detailed": {
+    "xgb": {
+      "val_accuracy": 0.7759,
+      "val_f1": 0.7111,
+      "val_precision": 0.6531,
+      "val_recall": 0.7805,
+      "val_auc": 0.8367,
+      "test_accuracy": 0.75,
+      "test_f1": 0.6667,
+      "test_precision": 0.617,
+      "test_recall": 0.725,
+      "test_auc": 0.8405,
+      "confusion_matrix": [
+        [
+          58,
+          18
+        ],
+        [
+          11,
+          29
+        ]
+      ],
+      "class_report": "              precision    recall  f1-score   support\n\n           0       0.84      0.76      0.80        76\n           1       0.62      0.72      0.67        40\n\n    accuracy                           0.75       116\n   macro avg       0.73      0.74      0.73       116\nweighted avg       0.76      0.75      0.75       116\n",
+      "train_time_sec": 13.82
+    },
+    "rf": {
+      "val_accuracy": 0.7845,
+      "val_f1": 0.7253,
+      "val_precision": 0.66,
+      "val_recall": 0.8049,
+      "val_auc": 0.839,
+      "test_accuracy": 0.7672,
+      "test_f1": 0.7033,
+      "test_precision": 0.6275,
+      "test_recall": 0.8,
+      "test_auc": 0.8441,
+      "confusion_matrix": [
+        [
+          57,
+          19
+        ],
+        [
+          8,
+          32
+        ]
+      ],
+      "class_report": "              precision    recall  f1-score   support\n\n           0       0.88      0.75      0.81        76\n           1       0.63      0.80      0.70        40\n\n    accuracy                           0.77       116\n   macro avg       0.75      0.78      0.76       116\nweighted avg       0.79      0.77      0.77       116\n",
+      "train_time_sec": 28.76
+    },
+    "svm": {
+      "val_accuracy": 0.7328,
+      "val_f1": 0.6593,
+      "val_precision": 0.6,
+      "val_recall": 0.7317,
+      "val_auc": 0.8221,
+      "test_accuracy": 0.7586,
+      "test_f1": 0.6889,
+      "test_precision": 0.62,
+      "test_recall": 0.775,
+      "test_auc": 0.8243,
+      "confusion_matrix": [
+        [
+          57,
+          19
+        ],
+        [
+          9,
+          31
+        ]
+      ],
+      "class_report": "              precision    recall  f1-score   support\n\n           0       0.86      0.75      0.80        76\n           1       0.62      0.78      0.69        40\n\n    accuracy                           0.76       116\n   macro avg       0.74      0.76      0.75       116\nweighted avg       0.78      0.76      0.76       116\n",
+      "train_time_sec": 21.14
+    },
+    "lr": {
+      "val_accuracy": 0.7759,
+      "val_f1": 0.7174,
+      "val_precision": 0.6471,
+      "val_recall": 0.8049,
+      "val_auc": 0.8361,
+      "test_accuracy": 0.7586,
+      "test_f1": 0.6889,
+      "test_precision": 0.62,
+      "test_recall": 0.775,
+      "test_auc": 0.847,
+      "confusion_matrix": [
+        [
+          57,
+          19
+        ],
+        [
+          9,
+          31
+        ]
+      ],
+      "class_report": "              precision    recall  f1-score   support\n\n           0       0.86      0.75      0.80        76\n           1       0.62      0.78      0.69        40\n\n    accuracy                           0.76       116\n   macro avg       0.74      0.76      0.75       116\nweighted avg       0.78      0.76      0.76       116\n",
+      "train_time_sec": 2.87
+    },
+    "gb": {
+      "val_accuracy": 0.7586,
+      "val_f1": 0.6585,
+      "val_precision": 0.6585,
+      "val_recall": 0.6585,
+      "val_auc": 0.8315,
+      "test_accuracy": 0.7672,
+      "test_f1": 0.6582,
+      "test_precision": 0.6667,
+      "test_recall": 0.65,
+      "test_auc": 0.8266,
+      "confusion_matrix": [
+        [
+          63,
+          13
+        ],
+        [
+          14,
+          26
+        ]
+      ],
+      "class_report": "              precision    recall  f1-score   support\n\n           0       0.82      0.83      0.82        76\n           1       0.67      0.65      0.66        40\n\n    accuracy                           0.77       116\n   macro avg       0.74      0.74      0.74       116\nweighted avg       0.77      0.77      0.77       116\n",
+      "train_time_sec": 24.26
+    },
+    "lgbm": {
+      "val_accuracy": 0.7586,
+      "val_f1": 0.7021,
+      "val_precision": 0.6226,
+      "val_recall": 0.8049,
+      "val_auc": 0.8403,
+      "test_accuracy": 0.7672,
+      "test_f1": 0.7033,
+      "test_precision": 0.6275,
+      "test_recall": 0.8,
+      "test_auc": 0.8299,
+      "confusion_matrix": [
+        [
+          57,
+          19
+        ],
+        [
+          8,
+          32
+        ]
+      ],
+      "class_report": "              precision    recall  f1-score   support\n\n           0       0.88      0.75      0.81        76\n           1       0.63      0.80      0.70        40\n\n    accuracy                           0.77       116\n   macro avg       0.75      0.78      0.76       116\nweighted avg       0.79      0.77      0.77       116\n",
+      "train_time_sec": 27.8
+    }
+  },
+  "ml_best_params": {
+    "max_depth": 28,
+    "max_features": "log2",
+    "min_samples_leaf": 6,
+    "min_samples_split": 3,
+    "n_estimators": 291
+  },
+  "ann_accuracy": 0.7328,
+  "ann_f1": 0.6076,
+  "ann_metrics": {
+    "accuracy": 0.7327586206896551,
+    "f1": 0.6075949367088608,
+    "precision": 0.6153846153846154,
+    "recall": 0.6,
+    "confusion_matrix": [
+      [
+        61,
+        15
+      ],
+      [
+        16,
+        24
+      ]
+    ],
+    "auc_roc": 0.8302631578947368
+  },
+  "ensemble_weights": {
+    "xgb": 0.14285714285714288,
+    "rf": 0.14285714285714288,
+    "svm": 0.14285714285714288,
+    "lr": 0.14285714285714288,
+    "gb": 0.14285714285714288,
+    "lgbm": 0.14285714285714288,
+    "dl": 0.14285714285714288
+  },
+  "ensemble_threshold": 0.37000000000000016,
+  "ensemble_results": {
+    "individual_models": {
+      "xgb": {
+        "accuracy": 0.75,
+        "f1": 0.6666666666666666,
+        "precision": 0.6170212765957447,
+        "recall": 0.725
+      },
+      "rf": {
+        "accuracy": 0.7672413793103449,
+        "f1": 0.7032967032967034,
+        "precision": 0.6274509803921569,
+        "recall": 0.8
+      },
+      "svm": {
+        "accuracy": 0.75,
+        "f1": 0.6233766233766234,
+        "precision": 0.6486486486486487,
+        "recall": 0.6
+      },
+      "lr": {
+        "accuracy": 0.7586206896551724,
+        "f1": 0.6888888888888889,
+        "precision": 0.62,
+        "recall": 0.775
+      },
+      "gb": {
+        "accuracy": 0.7672413793103449,
+        "f1": 0.6582278481012658,
+        "precision": 0.6666666666666666,
+        "recall": 0.65
+      },
+      "lgbm": {
+        "accuracy": 0.7672413793103449,
+        "f1": 0.7032967032967034,
+        "precision": 0.6274509803921569,
+        "recall": 0.8
+      },
+      "dl": {
+        "accuracy": 0.7327586206896551,
+        "f1": 0.6075949367088608,
+        "precision": 0.6153846153846154,
+        "recall": 0.6
+      }
+    },
+    "ensemble": {
+      "accuracy": 0.7672413793103449,
+      "f1": 0.7157894736842105,
+      "precision": 0.6181818181818182,
+      "recall": 0.85,
+      "auc": 0.8391447368421052,
+      "confusion_matrix": [
+        [
+          55,
+          21
+        ],
+        [
+          6,
+          34
+        ]
+      ]
+    },
+    "ensemble_stacking": {
+      "accuracy": 0.7586206896551724,
+      "f1": 0.6818181818181818,
+      "precision": 0.625,
+      "recall": 0.75
+    }
+  },
+  "features_expected": 18,
+  "training_samples": 536,
+  "validation_samples": 116,
+  "test_samples": 116,
+  "training_time_sec": 131.6,
+  "pipeline": {
+    "preprocessing": "DataPipeline (RobustScaler, Winsorization, feature engineering)",
+    "ml_models": "MachineLearningModelsEnhanced (RandomizedSearchCV, CalibratedClassifierCV)",
+    "dl_model": "DeepLearningModelEnhanced (256-128-64-32, calibrated)",
+    "ensemble": "EnsembleOptimizer (Bayesian weights, meta-learner, threshold optimization)",
+    "evaluation": "EvaluationMetrics (5-fold CV, SHAP, per-class metrics)"
+  },
+  "ensemble_strategy": "bayesian_weighted_voting_with_stacking"
+}
