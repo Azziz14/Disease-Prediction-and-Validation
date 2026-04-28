@@ -11,6 +11,7 @@ import Auth from './pages/Auth';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import DashboardLayout from './pages/DashboardLayout';
 import Dashboard from './pages/Dashboard';
+import AdminDashboard from './pages/AdminDashboard';
 import History from './pages/History';
 
 const App: React.FC = () => {
@@ -44,7 +45,7 @@ const App: React.FC = () => {
               {/* Protected Dashboard with Sidebar */}
               <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
                 <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/admin" element={<Dashboard />} />
+                <Route path="/admin" element={<AdminDashboard />} />
                 <Route path="/history" element={<History />} />
               </Route>
             </Routes>

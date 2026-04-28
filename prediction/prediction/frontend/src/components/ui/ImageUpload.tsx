@@ -1,9 +1,18 @@
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Image as ImageIcon, X, AlertTriangle, ScanLine } from 'lucide-react';
-import { imagePredictAPI } from '../../services/api';
+import { Upload, Image as ImageIcon, X, AlertTriangle, ScanLine, FileDown, Maximize2 } from 'lucide-react';
+import { imagePredictAPI, downloadReportPDF } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { usePatientData } from '../../hooks/usePatientData';
 
-const ImageUpload: React.FC = () => {
+interface ImageUploadProps {
+  patientId?: string;
+  patientName?: string;
+}
+
+const ImageUpload: React.FC<ImageUploadProps> = ({ patientId, patientName }) => {
+  const { user } = useAuth();
+  const { loadData } = usePatientData();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
@@ -31,11 +40,30 @@ const ImageUpload: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const res = await imagePredictAPI(file);
-      if (res?.error) setError(res.error);
-      else setResult(res);
-    } catch {
+      const pId = patientId || (user?.role === 'patient' ? user?.email : 'web_user');
+      const pName = patientName || (user?.role === 'patient' ? user?.name : 'Unknown Patient');
+      const dName = (user?.role === 'doctor') ? user?.name : 'Unspecified Physician';
+      const dId = (user?.role === 'doctor') ? user?.email : 'Unspecified Physician';
+
+      const res = await imagePredictAPI(file, pId, pName, dName, dId);
+      
+      if (!res) {
+        throw new Error('NULL_RESPONSE');
+      }
+
+      if (res.error) {
+        setError(res.error);
+        setResult(null);
+      } else {
+        setResult(res);
+        setError(''); // Force clear any previous error markers
+        // Refresh unified history from backend
+        loadData();
+      }
+    } catch (err) {
+      console.error('Submit Error:', err);
       setError('UPLINK FAILURE: VISUAL CORTEX UNREACHABLE.');
+      setResult(null);
     } finally {
       setLoading(false);
     }
@@ -108,7 +136,7 @@ const ImageUpload: React.FC = () => {
 
             {loading && (
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-0">
-                <span className="text-[var(--neon-green)] font-mono text-xl font-bold tracking-widest neon-text-green bg-black/50 px-4 py-2 rounded">SCANNING STRATA...</span>
+                <span className="text-[var(--neon-green)] font-mono text-xl font-bold tracking-widest neon-text-green bg-black/50 px-4 py-2 rounded">AUDITING PRESCRIPTION...</span>
               </div>
             )}
           </div>
@@ -123,32 +151,79 @@ const ImageUpload: React.FC = () => {
           )}
 
           {result && !loading && (
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6 glass-input p-6 rounded-xl border border-[var(--neon-purple)] shadow-[inset_0_0_20px_rgba(176,91,255,0.1)]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-[var(--neon-purple)] uppercase tracking-widest font-bold">Identified Anomaly</p>
-                  <p className="text-2xl font-bold text-white uppercase mt-1">{result.classification}</p>
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6">
+              <div className="bg-purple-900/10 border border-purple-500/30 rounded-xl p-6 shadow-[0_0_30px_rgba(168,85,247,0.1)]">
+                <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/5">
+                  <div>
+                    <p className="text-[10px] text-purple-400 uppercase tracking-[0.2em] font-bold">Consensus Diagnosis</p>
+                    <p className="text-2xl font-bold text-white uppercase mt-1">
+                      {result.consensus_intelligence?.diagnosis || result.prediction?.disease || 'General Diagnosis'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest">Trust Index</p>
+                    <p className="text-xl font-mono text-cyan-400 font-bold">
+                       {Math.round((result.consensus_intelligence?.confidence || 0) * 100)}%
+                    </p>
+                  </div>
                 </div>
-                <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-black ${severityColor(result.severity)}`}>
-                  {result.severity}
-                </span>
-              </div>
 
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-400 font-bold uppercase tracking-widest">Confidence Index</span>
-                  <span className="text-white font-bold">{result.confidence}%</span>
-                </div>
-                <div className="w-full h-3 bg-black border border-white/20 rounded-full overflow-hidden">
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${result.confidence}%` }} transition={{ duration: 1 }} className="h-full rounded-full bg-[var(--neon-purple)] shadow-[0_0_10px_var(--neon-purple)]" />
-                </div>
-              </div>
+                {/* Handwriting Audit Sub-panel */}
+                {result.consensus_intelligence?.handwriting_audit && (
+                   <div className="bg-black/40 rounded-xl p-4 border border-white/5 mb-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] text-gray-400 uppercase tracking-widest font-bold flex items-center gap-2">
+                           <ScanLine size={12} className="text-cyan-400" /> Handwriting Clarity
+                        </span>
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                          result.consensus_intelligence.handwriting_audit.is_legible ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                        }`}>
+                          {result.consensus_intelligence.handwriting_audit.verdict}
+                        </span>
+                      </div>
+                      <p className="text-xs text-blue-200/80 italic leading-relaxed">
+                        "{result.consensus_intelligence.handwriting_audit.audit_note}"
+                      </p>
+                   </div>
+                )}
 
-              {result.description && (
-                <p className="text-sm text-gray-300 bg-black/40 border border-white/10 rounded-xl p-4 font-mono leading-relaxed">
-                  <span className="text-[var(--neon-blue)] mr-2">{'>'}</span>{result.description}
-                </p>
-              )}
+                {/* Detailed Medications */}
+                {result.auto_medications && result.auto_medications.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-[10px] text-purple-300 uppercase tracking-widest font-bold mb-1">Identified Pharmacological Agents</p>
+                    {result.auto_medications.map((med: any, i: number) => (
+                      <div key={i} className="bg-white/5 rounded-lg p-3 border border-white/5">
+                        <div className="flex justify-between items-center">
+                           <p className="text-white font-bold text-sm tracking-wide">{med.name}</p>
+                           <span className="text-[10px] text-purple-400 font-mono uppercase">Extracted</span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">{med.note}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {result.consensus_intelligence?.narrative && (
+                  <div className="mt-6 p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/20">
+                     <p className="text-[10px] text-cyan-500 uppercase tracking-widest font-bold mb-2">Clinical Rationale</p>
+                     <p className="text-xs text-cyan-200/70 leading-relaxed font-sans italic">
+                       {result.consensus_intelligence.narrative}
+                     </p>
+                  </div>
+                )}
+
+                {/* PDF Report Download Action */}
+                {result.record_id && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => downloadReportPDF(result.record_id)}
+                    className="w-full mt-8 py-4 flex items-center justify-center gap-3 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded-xl font-bold text-xs uppercase tracking-[0.2em] shadow-[0_0_25px_rgba(34,211,238,0.1)] hover:bg-cyan-500/20 transition-all"
+                  >
+                    <FileDown size={18} /> Download High-Quality Medical Report (PDF)
+                  </motion.button>
+                )}
+              </div>
             </motion.div>
           )}
         </div>

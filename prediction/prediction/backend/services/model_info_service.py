@@ -29,6 +29,7 @@ class ModelInfoService:
         accuracies = manifest.get("ml_accuracies", {})
         best = manifest.get("best_ml_model", "unknown")
         features_expected = manifest.get("features_expected", 8)
+        ensemble_strategy = manifest.get("ensemble_strategy", "Unavailable")
 
         model_names = {
             "rf": "Random Forest",
@@ -55,7 +56,7 @@ class ModelInfoService:
             "models": models,
             "best_model": model_names.get(best, best),
             "features_expected": features_expected,
-            "ensemble_strategy": "Weighted Average (ML 60% + ANN 40%)",
+            "ensemble_strategy": ensemble_strategy,
             "disclaimer": (
                 "Model accuracy is measured on held-out test data and may not reflect "
                 "real-world clinical performance. These metrics are provided for transparency "

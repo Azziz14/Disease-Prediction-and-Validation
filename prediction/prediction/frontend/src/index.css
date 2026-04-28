@@ -9,6 +9,7 @@
     --neon-purple: #b05bff;
     --neon-green: #39ff14;
     --neon-blue: #00f3ff;
+    --neon-ice: #9ffcff;
     --cyber-dark: #090a0f;
     --cyber-glass: rgba(16, 18, 27, 0.6);
     --cyber-border: rgba(0, 243, 255, 0.2);
@@ -20,7 +21,11 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     @apply text-white;
-    background: transparent;
+    background:
+      radial-gradient(circle at top left, rgba(0, 243, 255, 0.10), transparent 24%),
+      radial-gradient(circle at top right, rgba(176, 91, 255, 0.08), transparent 22%),
+      radial-gradient(circle at bottom center, rgba(57, 255, 20, 0.06), transparent 20%),
+      linear-gradient(180deg, #06070b 0%, #090a0f 42%, #05060a 100%);
     line-height: 1.6;
     overflow-x: hidden;
   }
@@ -45,6 +50,25 @@
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 0 20px rgba(0, 243, 255, 0.05);
   border-radius: 20px;
   transition: all 0.4s ease;
+}
+
+.dashboard-hud {
+  position: relative;
+}
+
+.dashboard-hud::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(0,243,255,0.28), rgba(176,91,255,0.10), rgba(57,255,20,0.10));
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 .glass-panel:hover {

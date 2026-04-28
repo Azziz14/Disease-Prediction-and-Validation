@@ -35,7 +35,7 @@ const Auth: React.FC = () => {
   const [error, setError] = useState('');
   const [focusedField, setFocusedField] = useState('');
 
-  const { login, loginWithPassword } = useAuth();
+  const { register, loginWithPassword } = useAuth();
   const navigate = useNavigate();
 
   // Optimized bending/parallax effect for smooth input tracking
@@ -57,32 +57,34 @@ const Auth: React.FC = () => {
     };
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!email || !password || (!isLogin && !name)) { setError('ALL FIELDS REQUIRED FOR CLEARANCE.'); return; }
     if (password.length < 6) { setError('MINIMUM 6-CHAR PASSPHRASE REQUIRED.'); return; }
     
     if (isLogin) {
-      // Use credential-based login
-      const result = loginWithPassword(email, password);
+      const result = await loginWithPassword(email, password);
       if (!result.success) {
         setError(result.error || 'Authentication failed.');
         return;
       }
-      // Determine redirect from stored user
       const stored = localStorage.getItem('carepredict_user');
       const parsed = stored ? JSON.parse(stored) : null;
       navigate(parsed?.role === 'admin' ? '/admin' : '/dashboard');
     } else {
-      // Register mode
-      login(email, role, name);
+      // Register mode — stores password hash
+      const result = await register(email, password, role, name);
+      if (!result.success) {
+        setError(result.error || 'Registration failed.');
+        return;
+      }
       navigate(role === 'admin' ? '/admin' : '/dashboard');
     }
   };
 
   const inputClasses = (field: string) => 
-    `w-full pl-11 pr-4 py-3.5 glass-input rounded-xl text-sm font-medium placeholder:text-gray-500 transition-all duration-300 ${
+    `w-full pl-11 pr-4 py-3.5 bg-black/80 border border-white/20 hover:border-[var(--neon-blue)] rounded-xl text-sm font-bold text-white placeholder:text-gray-500 transition-all duration-300 ${
       focusedField === field ? 'scale-[1.02] border-[var(--neon-blue)] shadow-[0_0_15px_rgba(0,243,255,0.3)]' : ''
     }`;
 
@@ -260,20 +262,7 @@ const Auth: React.FC = () => {
           Encrypted Neural Handshake Protocol v3.0
         </p>
 
-        {/* Demo credentials hint */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="mt-6 bg-white/5 border border-white/10 rounded-xl p-4 text-center"
-        >
-          <p className="text-[10px] uppercase tracking-widest text-cyan-500/60 mb-3 font-bold">Demo Credentials</p>
-          <div className="space-y-1.5 text-xs text-gray-400">
-            <p><span className="text-cyan-400 font-mono">admin@admin.com</span> / <span className="text-gray-300">admin123</span> <span className="text-[9px] text-purple-400 uppercase">(Admin)</span></p>
-            <p><span className="text-cyan-400 font-mono">doctor@doctor.com</span> / <span className="text-gray-300">doctor123</span> <span className="text-[9px] text-green-400 uppercase">(Doctor)</span></p>
-            <p><span className="text-cyan-400 font-mono">patient@patient.com</span> / <span className="text-gray-300">patient123</span> <span className="text-[9px] text-blue-400 uppercase">(Patient)</span></p>
-          </div>
-        </motion.div>
+
       </motion.div>
     </div>
   );

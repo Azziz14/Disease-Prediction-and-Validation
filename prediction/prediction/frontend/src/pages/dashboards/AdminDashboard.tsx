@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { 
   Users, Stethoscope, Activity, AlertTriangle, Shield, Heart, Brain, 
-  Pill, ChevronDown, ChevronUp, Search
+  Pill, ChevronDown, ChevronUp, Search, ShieldCheck, Mail, Send, Loader2
 } from 'lucide-react';
 
 const RISK_CONFIG: Record<string, { color: string; bg: string; border: string; glow: string }> = {
@@ -38,9 +38,41 @@ const AdminDashboard: React.FC = () => {
   const [filterRisk, setFilterRisk] = useState<string>('all');
   const [filterDisease, setFilterDisease] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeDoctorTab, setActiveDoctorTab] = useState<string | null>(null);
+  const [pingModal, setPingModal] = useState<{ open: boolean; docId: string; docName: string }>({ open: false, docId: '', docName: '' });
+  const [pingMessage, setPingMessage] = useState('');
+  const [sendingPing, setSendingPing] = useState(false);
+
+  // Feedback State
+  const [feedback, setFeedback] = useState<any[]>([]);
+  const [flaggingDoctor, setFlaggingDoctor] = useState<string | null>(null);
+  const [flagReason, setFlagReason] = useState('');
+  const [submittingFlag, setSubmittingFlag] = useState(false);
+
+  const handleSendPing = async () => {
+    if (!pingMessage.trim()) return;
+    setSendingPing(true);
+    try {
+      await fetch(`http://${window.location.hostname}:5000/api/send-ping`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_id: user?.id,
+          doctor_id: pingModal.docId,
+          message: pingMessage
+        })
+      });
+      alert(`Priority Ping sent to Dr. ${pingModal.docName}`);
+      setPingModal({ open: false, docId: '', docName: '' });
+      setPingMessage('');
+    } catch (e) {
+      console.error(e);
+    }
+    setSendingPing(false);
+  };
 
   useEffect(() => {
-    fetch(`http://localhost:5000/api/dashboard-data?role=admin`)
+    fetch(`http://${window.location.hostname}:5000/api/dashboard-data?role=admin`)
       .then(res => res.json())
       .then(res => {
         if (res.status === 'success') {
@@ -52,7 +84,39 @@ const AdminDashboard: React.FC = () => {
         console.error(err);
         setLoading(false);
       });
+
+    // Fetch Feedback
+    fetch(`http://${window.location.hostname}:5000/api/all-feedback`)
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === 'success') {
+          setFeedback(res.data);
+        }
+      })
+      .catch(err => console.error(err));
   }, []);
+
+  const handleFlagDoctor = async () => {
+    if (!flaggingDoctor || !flagReason.trim()) return;
+    setSubmittingFlag(true);
+    try {
+      await fetch(`http://${window.location.hostname}:5000/api/flag-doctor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          doctor_id: flaggingDoctor,
+          reason: flagReason,
+          flagged_by: user?.name || 'admin'
+        })
+      });
+      alert('Physician flagged successfully.');
+      setFlaggingDoctor(null);
+      setFlagReason('');
+    } catch (e) {
+      console.error(e);
+    }
+    setSubmittingFlag(false);
+  };
 
   if (loading) return (
     <div className="flex items-center justify-center h-96">
@@ -356,6 +420,195 @@ const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* ═══ CLINICAL STAFF HUB (ACCOUNTABILITY) ═══ */}
+      <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+        <div className="p-5 border-b border-white/10 flex justify-between items-center">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <Stethoscope size={18} className="text-purple-400" />
+              Clinical Staff Registry (Accountability Hub)
+            </h2>
+            <div className="px-2 py-1 bg-purple-500/10 border border-purple-500/30 rounded text-[10px] text-purple-400 font-bold uppercase tracking-widest">
+              Live Audit Active
+            </div>
+        </div>
+        
+        <div className="divide-y divide-white/5">
+          {(data?.doctor_registry || []).map((doc: any) => (
+            <div key={doc.id} className="transition-all">
+              <div 
+                className="p-5 flex items-center justify-between cursor-pointer hover:bg-white/[0.02]"
+                onClick={() => setActiveDoctorTab(activeDoctorTab === doc.id ? null : doc.id)}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xl ${doc.rank > 90 ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                    {doc.rank}
+                  </div>
+                  <div>
+                    <h3 className="text-white font-bold">Dr. {doc.name}</h3>
+                    <p className="text-xs text-white/40">{doc.email}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-8">
+                  <div className="text-center">
+                    <p className="text-[10px] text-white/40 uppercase font-bold mb-1">Rank</p>
+                    <p className={`text-sm font-bold ${doc.rank > 90 ? 'text-green-400' : 'text-orange-400'}`}>{doc.rank}%</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-white/40 uppercase font-bold mb-1">Errors (Flags)</p>
+                    <p className={`text-sm font-bold ${doc.errors > 0 ? 'text-red-400' : 'text-white/60'}`}>{doc.errors}</p>
+                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setPingModal({ open: true, docId: doc.id, docName: doc.name }); }}
+                    className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-all"
+                    title="Ping Doctor"
+                  >
+                    <Send size={16} />
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setFlaggingDoctor(doc.id); setFlagReason(`Administrative review for Dr. ${doc.name}`); }}
+                    className="p-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all"
+                    title="Flag Physician"
+                  >
+                    <AlertTriangle size={16} />
+                  </button>
+                  {activeDoctorTab === doc.id ? <ChevronUp size={16} className="text-white/20"/> : <ChevronDown size={16} className="text-white/20"/>}
+                </div>
+              </div>
+
+              {activeDoctorTab === doc.id && (
+                <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} className="bg-black/20 border-t border-white/5 overflow-hidden">
+                  <div className="p-5">
+                    <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-4">Assigned Patient Audit List</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {doc.patients.map((p: any) => (
+                        <div key={p.id} className={`p-4 rounded-xl border flex items-center justify-between ${p.has_flags ? 'bg-red-500/10 border-red-500/30' : 'bg-white/5 border-white/10'}`}>
+                          <div className="flex items-center gap-3">
+                            <div className={`w-2 h-2 rounded-full ${p.has_flags ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`} />
+                            <span className="text-sm font-medium text-white">{p.name}</span>
+                          </div>
+                          {p.has_flags && (
+                            <span className="text-[10px] bg-red-500 text-white font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
+                              <AlertTriangle size={10} /> Wrong Prescription Detected
+                            </span>
+                          )}
+                          {!p.has_flags && <span className="text-[10px] text-green-500 font-bold uppercase tracking-widest">Validated History</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* --- PING MODAL --- */}
+      <AnimatePresence>
+        {pingModal.open && (
+           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
+             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-[#0f172a] border border-cyan-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-bold text-white">Ping Dr. {pingModal.docName}</h3>
+                  <button onClick={() => setPingModal({ open: false, docId: '', docName: '' })} className="text-white/40 hover:text-white">✕</button>
+                </div>
+                <p className="text-sm text-white/60 mb-4">Send a priority clinical directive or warning to this staff member. This will appear as a notification in their dashboard.</p>
+                <textarea 
+                  className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-cyan-500 transition-all h-32 mb-6"
+                  placeholder="e.g. Audit required for Patient Aarav Gupta. Neural Consensus flags unsafe medication mismatch."
+                  value={pingMessage}
+                  onChange={(e) => setPingMessage(e.target.value)}
+                />
+                <button 
+                  onClick={handleSendPing}
+                  disabled={sendingPing}
+                  className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2"
+                >
+                  {sendingPing ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><Send size={18}/> Send Priority Directive</>}
+                </button>
+             </motion.div>
+           </div>
+        )}
+      </AnimatePresence>
+
+      {/* ═══ PATIENT FEEDBACK LOG ═══ */}
+      <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+        <div className="p-5 border-b border-white/10">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <Mail size={18} className="text-emerald-400" />
+            Patient Feedback Stream
+          </h2>
+        </div>
+        <div className="divide-y divide-white/5 max-h-[400px] overflow-y-auto">
+          {feedback.map((f, i) => (
+            <div key={i} className="p-5 hover:bg-white/[0.02] transition-colors flex justify-between items-start">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-white font-bold">{f.patient_name}</span>
+                  <span className="text-[10px] text-white/30 uppercase tracking-widest">{new Date(f.timestamp).toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-1 mb-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Sparkles 
+                      key={star} 
+                      size={10} 
+                      className={f.rating >= star ? 'text-yellow-400' : 'text-white/10'} 
+                      fill={f.rating >= star ? 'currentColor' : 'none'} 
+                    />
+                  ))}
+                  <span className="text-[10px] text-white/30 ml-2 font-bold uppercase tracking-widest">{f.rating}/5</span>
+                </div>
+                <p className="text-sm text-white/70 leading-relaxed italic">"{f.message}"</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-[10px] text-white/40 uppercase font-bold">Regarding:</span>
+                  <span className="text-xs text-cyan-400 font-bold">Dr. {f.doctor_name}</span>
+                </div>
+              </div>
+              <button 
+                onClick={() => { setFlaggingDoctor(f.doctor_id); setFlagReason(`Based on patient feedback: ${f.message.substring(0, 50)}...`); }}
+                className="px-3 py-1.5 bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-red-500/20 transition-all flex items-center gap-2"
+              >
+                <AlertTriangle size={12} /> Flag Physician
+              </button>
+            </div>
+          ))}
+          {feedback.length === 0 && (
+            <div className="p-10 text-center text-white/30 text-sm italic">
+              No patient feedback entries received yet.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ═══ FLAG MODAL ═══ */}
+      <AnimatePresence>
+        {flaggingDoctor && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-[#0f172a] border border-red-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-white">Flag Physician for Review</h3>
+                <button onClick={() => setFlaggingDoctor(null)} className="text-white/40 hover:text-white">✕</button>
+              </div>
+              <p className="text-sm text-white/60 mb-4">You are placing a formal flag on this physician. This will appear on their dashboard as a high-priority warning.</p>
+              <textarea 
+                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-red-500 transition-all h-32 mb-6"
+                placeholder="Reason for flagging..."
+                value={flagReason}
+                onChange={(e) => setFlagReason(e.target.value)}
+              />
+              <button 
+                onClick={handleFlagDoctor}
+                disabled={submittingFlag}
+                className="w-full py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
+              >
+                {submittingFlag ? <Loader2 className="w-5 h-5 animate-spin" /> : <><AlertTriangle size={18}/> Confirm Formal Flag</>}
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* ═══ RECENT PREDICTIONS LOG ═══ */}
       <div className="bg-white/5 border border-white/10 rounded-xl p-5">
         <h2 className="text-sm font-bold text-white/70 uppercase tracking-widest mb-4">Recent ML Predictions Log</h2>
@@ -364,7 +617,10 @@ const AdminDashboard: React.FC = () => {
             const risk = RISK_CONFIG[p.risk] || RISK_CONFIG['Low'];
             return (
               <div key={i} className="flex items-center justify-between text-sm py-2.5 px-3 rounded-lg hover:bg-white/5 transition-colors">
-                <span className="text-white/40 text-xs font-mono w-40">{new Date(p.timestamp).toLocaleString()}</span>
+                <span className="text-white/40 text-xs font-mono w-40">{(() => {
+                  const d = new Date(p.timestamp);
+                  return isNaN(d.getTime()) ? 'Date N/A' : d.toLocaleString();
+                })()}</span>
                 <span className="flex items-center gap-2 text-white/70 capitalize">
                   {DISEASE_ICONS[p.disease]} {p.disease}
                 </span>

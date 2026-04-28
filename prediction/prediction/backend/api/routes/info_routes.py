@@ -1,15 +1,14 @@
 from flask import Blueprint, request, jsonify
-from services.model_info_service import ModelInfoService
+from services.runtime_services import get_model_info_service
 
 info_bp = Blueprint('info', __name__)
-
-model_info = ModelInfoService()
 
 
 @info_bp.route('/model-info', methods=['GET'])
 def get_model_info():
     try:
         disease = request.args.get('disease', 'diabetes')
+        model_info = get_model_info_service()
         result = model_info.get_model_info(disease)
         return jsonify(result)
     except Exception as e:

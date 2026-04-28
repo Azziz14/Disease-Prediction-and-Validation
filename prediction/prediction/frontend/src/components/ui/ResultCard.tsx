@@ -1,6 +1,6 @@
-import React from 'react';
-import { ShieldAlert, ShieldCheck, Activity, Pill, AlertTriangle, Fingerprint, Crosshair, HeartPulse, BatteryCharging, CheckCircle2 } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, Activity, Pill, AlertTriangle, Fingerprint, Crosshair, HeartPulse, BatteryCharging, CheckCircle2, FileDown } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { downloadReportPDF } from '../../services/api';
 
 const ResultCard: React.FC<{ result: any }> = ({ result }) => {
   if (!result) return null;
@@ -142,24 +142,56 @@ const ResultCard: React.FC<{ result: any }> = ({ result }) => {
         </div>
       )}
 
-      {/* Auto-Suggested Medications (when no prescription was provided) */}
+      {/* 3b. Handwriting Audit (Visual Scans only) */}
+      {result.consensus_intelligence?.handwriting_audit && (
+        <div className="bg-blue-900/10 border border-blue-500/30 rounded-xl p-4">
+          <h4 className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+            <Activity size={14} className="text-blue-400" /> SCAN QUALITY AUDIT
+          </h4>
+          <div className="flex items-center justify-between mb-2">
+             <span className="text-xs text-gray-400">Handwriting Clarity</span>
+             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+               result.consensus_intelligence.handwriting_audit.is_legible ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+             }`}>
+               {result.consensus_intelligence.handwriting_audit.verdict}
+             </span>
+          </div>
+          <p className="text-blue-200/80 text-sm italic">"{result.consensus_intelligence.handwriting_audit.audit_note}"</p>
+        </div>
+      )}
+
+      {/* 4. Auto-Suggested Medications */}
       {result.auto_medications && result.auto_medications.length > 0 && (
         <div className="bg-purple-900/10 border border-purple-500/30 rounded-xl p-4 shadow-[0_0_15px_rgba(168,85,247,0.1)]">
           <h4 className="text-xs font-bold text-purple-400 uppercase tracking-widest mb-3 flex items-center gap-2">
             <Pill size={14} /> RECOMMENDED MEDICATIONS
           </h4>
           <div className="space-y-3">
-            {result.auto_medications.map((med: any, i: number) => (
-              <div key={i} className="bg-white/5 rounded-lg p-3 border border-white/5">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-white font-bold text-sm">{med.name}</p>
-                    <p className="text-cyan-400 text-xs font-mono">{med.dosage} — {med.frequency}</p>
+            {result.auto_medications.map((med: any, i: number) => {
+              // Check if we have detailed role info for this drug from the multimodal consensus
+              const detailedInfo = (result.consensus_intelligence?.medication_details || []).find(
+                (d: any) => d.name.toLowerCase().includes(med.name.toLowerCase()) || med.name.toLowerCase().includes(d.name.toLowerCase())
+              );
+
+              return (
+                <div key={i} className="bg-white/5 rounded-lg p-3 border border-white/5">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-white font-bold text-sm">{med.name}</p>
+                      <p className="text-cyan-400 text-xs font-mono">{med.dosage} — {med.frequency}</p>
+                    </div>
                   </div>
+                  <p className="text-gray-400 text-[11px] mt-1">{med.note}</p>
+                  
+                  {detailedInfo?.role && (
+                    <div className="mt-2 pt-2 border-t border-white/5">
+                      <p className="text-[10px] text-purple-300/80 uppercase tracking-widest mb-1">Drug Role & Purpose</p>
+                      <p className="text-xs text-purple-100/90 leading-relaxed font-serif italic">{detailedInfo.role}</p>
+                    </div>
+                  )}
                 </div>
-                <p className="text-gray-400 text-[11px] mt-1">{med.note}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <p className="text-[9px] text-gray-600 mt-3 italic">
             Auto-suggested based on risk assessment. Always consult a healthcare professional.
@@ -182,6 +214,18 @@ const ResultCard: React.FC<{ result: any }> = ({ result }) => {
             ))}
           </div>
         </div>
+      )}
+
+      {/* 5. PDF Clinical Report Download */}
+      {result.record_id && (
+        <motion.button
+          whileHover={{ scale: 1.02, backgroundColor: 'rgba(34, 211, 238, 0.15)' }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => downloadReportPDF(result.record_id)}
+          className="w-full mt-2 py-4 flex items-center justify-center gap-3 bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 rounded-xl font-bold text-xs uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(34,211,238,0.1)] hover:border-cyan-400 transition-all"
+        >
+          <FileDown size={16} /> DOWNLOAD CLINICAL PDF REPORT
+        </motion.button>
       )}
     </motion.div>
   );

@@ -1,15 +1,23 @@
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from pymongo.errors import ConnectionFailure
 import logging
+from config import Config
 
 logger = logging.getLogger(__name__)
 
 class MongoDBClient:
     _instance = None
 
-    def __new__(cls, uri="mongodb://localhost:27017/", db_name="healthcare_ai"):
+    def __new__(cls, uri=None, db_name=None):
         if cls._instance is None:
             cls._instance = super(MongoDBClient, cls).__new__(cls)
+            uri = uri or Config.MONGODB_URI
+            db_name = db_name or Config.MONGODB_DB_NAME
+            if not uri:
+                logger.warning("MongoDB URI not configured. Database features will use local fallbacks where available.")
+                cls._instance.client = None
+                cls._instance.db = None
+                return cls._instance
             try:
                 cls._instance.client = MongoClient(uri, serverSelectionTimeoutMS=5000)
                 cls._instance.client.admin.command('ping')

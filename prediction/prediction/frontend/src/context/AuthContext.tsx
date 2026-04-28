@@ -1,14 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { loginAPI, registerAPI } from '../services/api';
 
 export type Role = 'doctor' | 'admin' | 'patient';
-
-// ═══ DEMO ACCOUNTS ═══
-// Pre-seeded accounts for easy access
-const DEMO_ACCOUNTS: Record<string, { password: string; name: string; role: Role }> = {
-  'admin@admin.com':   { password: 'admin123',   name: 'System Admin',    role: 'admin' },
-  'doctor@doctor.com': { password: 'doctor123',  name: 'Dr. Smith',       role: 'doctor' },
-  'patient@patient.com': { password: 'patient123', name: 'John Doe',      role: 'patient' },
-};
 
 export interface User {
   id: string;
@@ -19,8 +12,8 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, role: Role, name: string) => void;
-  loginWithPassword: (email: string, password: string) => { success: boolean; error?: string };
+  register: (email: string, password: string, role: Role, name: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithPassword: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   isAuthenticated: boolean;
   isAdmin: boolean;
@@ -29,48 +22,66 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    // Check local storage on initial mount
-    const storedUser = localStorage.getItem('carepredict_user');
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        console.error("Failed to parse user from local storage", e);
-      }
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const stored = localStorage.getItem('carepredict_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
     }
-  }, []);
+  });
 
-  const login = (email: string, role: Role, name: string) => {
-    // Mock user login by generating deterministic ID from email for session
-    const newUser: User = { 
-      id: `usr_${btoa(email).substring(0, 10)}`, 
-      email, 
-      name, 
-      role 
-    };
+  const setActiveUser = (newUser: User) => {
     setUser(newUser);
     localStorage.setItem('carepredict_user', JSON.stringify(newUser));
   };
 
-  const loginWithPassword = (email: string, password: string): { success: boolean; error?: string } => {
+  const register = async (email: string, password: string, role: Role, name: string): Promise<{ success: boolean; error?: string }> => {
     const emailLower = email.toLowerCase().trim();
-    const demo = DEMO_ACCOUNTS[emailLower];
-    if (demo) {
-      if (demo.password === password) {
-        login(emailLower, demo.role, demo.name);
-        return { success: true };
-      }
-      return { success: false, error: 'Invalid password for demo account.' };
+
+    if (!emailLower || !password || !name) {
+      return { success: false, error: 'All fields are required.' };
     }
-    // For non-demo accounts, accept any password >= 6 chars (mock auth)
-    if (password.length >= 6) {
-      login(emailLower, 'doctor', emailLower.split('@')[0]);
-      return { success: true };
+    if (password.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters.' };
     }
-    return { success: false, error: 'Password must be at least 6 characters.' };
+
+    const result = await registerAPI({
+      email: emailLower,
+      password,
+      role,
+      name
+    });
+
+    if (!result.success || !result.user) {
+      return { success: false, error: result.error || 'Registration failed. Please try again.' };
+    }
+
+    setActiveUser(result.user);
+    return { success: true };
+  };
+
+  const loginWithPassword = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    const emailLower = email.toLowerCase().trim();
+
+    if (!emailLower || !password) {
+      return { success: false, error: 'Email and password are required.' };
+    }
+    if (password.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters.' };
+    }
+
+    const result = await loginAPI({
+      email: emailLower,
+      password
+    });
+
+    if (!result.success || !result.user) {
+      return { success: false, error: result.error || 'Login failed. Please try again.' };
+    }
+
+    setActiveUser(result.user);
+    return { success: true };
   };
 
   const logout = () => {
@@ -81,7 +92,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   return (
     <AuthContext.Provider value={{
       user,
-      login,
+      register,
       loginWithPassword,
       logout,
       isAuthenticated: !!user,

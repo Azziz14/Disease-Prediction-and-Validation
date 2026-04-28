@@ -1,10 +1,7 @@
 from flask import Blueprint, request, jsonify
-from models.image_classifier import ImageClassifier
+from services.runtime_services import get_image_classifier
 
 image_bp = Blueprint('image', __name__)
-
-# Initialize classifier once at module load
-classifier = ImageClassifier()
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'bmp', 'webp'}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
@@ -38,16 +35,46 @@ def predict_image():
         if len(image_bytes) == 0:
             return jsonify({"error": "Empty file uploaded."}), 400
 
+        classifier = get_image_classifier()
         result = classifier.predict(image_bytes)
 
+        # 1. Save to MongoDB Dashboard
+        from utils.db import db_client
+        import datetime
+        patient_id = request.form.get("patient_id", "web_user")
+        record_id = None
+        if db_client.db is not None:
+            try:
+                record_doc = {
+                    "patient_id": patient_id,
+                    "disease": "Dermatology",
+                    "risk": result["severity"],
+                    "confidence": result["confidence"],
+                    "input_method": "image_scan",
+                    "timestamp": datetime.datetime.utcnow(),
+                    "classification": result["classification"],
+                    "recommendations": {
+                        "lifestyle": [result["description"]],
+                        "medical": [result["recommended_action"]],
+                        "precautions": ["URGENT: Consult professional dermatology for definitive biopsy."] if result["severity"] == "Critical" else ["Monitor daily."]
+                    }
+                }
+                insert_res = db_client.db.medical_records.insert_one(record_doc)
+                record_id = str(insert_res.inserted_id)
+                print(f"[IMAGE] Saved scan result: {record_id}")
+            except Exception as dberr:
+                print(f"[DB ERROR] Image save failed: {dberr}")
+
         return jsonify({
+            "status": "success",
+            "record_id": record_id,
             "classification": result["classification"],
             "confidence": result["confidence"],
             "severity": result["severity"],
             "description": result["description"],
             "recommended_action": result["recommended_action"],
             "differential_diagnosis": result["differential_diagnosis"],
-            "disclaimer": "This is an AI-assisted analysis and should not replace professional medical diagnosis. Always consult a qualified dermatologist."
+            "disclaimer": "This is an AI-assisted analysis and should not replace professional medical diagnosis."
         })
 
     except Exception as e:

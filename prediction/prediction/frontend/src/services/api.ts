@@ -3,11 +3,23 @@
  * Handles all communication with the backend Flask server
  */
 
-const BASE_URL = 'http://127.0.0.1:5000/api';
+const BASE_URL = `http://${window.location.hostname}:5000/api`;
 
 /**
  * API Response Types
  */
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: 'doctor' | 'admin' | 'patient';
+}
+
+export interface AuthResponse {
+  success: boolean;
+  user?: AuthUser;
+  error?: string;
+}
 
 export interface FeatureAnalysis {
   name: string;
@@ -48,6 +60,23 @@ export interface PredictionResponse {
   suggestions: string[];
   drug_interactions: string[];
   drug_details: Record<string, any>;
+  auto_medications?: Array<{
+    name?: string;
+    dosage?: string;
+    frequency?: string;
+    note?: string;
+  }>;
+  recommendations?: {
+    lifestyle?: string[];
+    medical?: string[];
+    precautions?: string[];
+  };
+  prescription_evaluation?: {
+    provided?: boolean;
+    status?: string;
+    message?: string;
+    details?: string[];
+  };
   report?: HealthReport;
   error?: string;
 }
@@ -56,16 +85,39 @@ export interface PredictionRequest {
   features: number[];
   prescription: string;
   disease?: string;
+  patient_id?: string;
+  patient_name?: string;
+  treating_doctor?: string;
 }
 
 export interface ImagePredictionResponse {
-  classification: string;
-  confidence: number;
-  severity: string;
-  description: string;
-  recommended_action: string;
-  differential_diagnosis: { label: string; confidence: number }[];
-  disclaimer: string;
+  status: string;
+  prediction?: any;
+  record_id?: string;
+  consensus_intelligence?: {
+    diagnosis: string;
+    confidence: number;
+    narrative: string;
+    directives: any;
+    handwriting_audit: {
+       is_legible: boolean;
+       clarity_score: number;
+       verdict: string;
+       audit_note: string;
+    };
+    medication_details: Array<{
+       name: string;
+       role: string;
+       target_condition: string;
+    }>;
+  };
+  auto_medications?: Array<{
+    name: string;
+    dosage: string;
+    frequency: string;
+    note: string;
+  }>;
+  prescription_image?: string;
   error?: string;
 }
 
@@ -84,6 +136,48 @@ export interface ModelInfo {
   message?: string;
 }
 
+export const registerAPI = async (payload: {
+  email: string;
+  password: string;
+  role: 'doctor' | 'admin' | 'patient';
+  name: string;
+}): Promise<AuthResponse> => {
+  try {
+    const response = await fetch(`${BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    return await response.json();
+  } catch (err) {
+    console.error('Register API Error:', err);
+    return { success: false, error: 'Could not connect to the authentication server.' };
+  }
+};
+
+export const loginAPI = async (payload: {
+  email: string;
+  password: string;
+}): Promise<AuthResponse> => {
+  try {
+    const response = await fetch(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    return await response.json();
+  } catch (err) {
+    console.error('Login API Error:', err);
+    return { success: false, error: 'Could not connect to the authentication server.' };
+  }
+};
+
 /**
  * Predict diabetes risk and get medication recommendations
  */
@@ -91,31 +185,39 @@ export const predictAPI = async (
   data: PredictionRequest
 ): Promise<PredictionResponse | null> => {
   try {
-    const response = await fetch(`${BASE_URL}/predict`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 40000); // 40 second timeout
+    
+    try {
+      const response = await fetch(`${BASE_URL}/predict`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data),
+        signal: controller.signal
+      });
 
-    if (!response.ok) {
-      console.error(`HTTP Error: ${response.status}`);
-      return { 
-        error: `Server returned status ${response.status}`,
-        risk: 'Low',
-        confidence: 0,
-        disease: 'Unknown',
-        matched_drugs: [],
-        suggestions: [],
-        drug_interactions: [],
-        drug_details: {},
-        explanation: {}
-      };
+      if (!response.ok) {
+        console.error(`HTTP Error: ${response.status}`);
+        return { 
+          error: `Server returned status ${response.status}`,
+          risk: 'Low',
+          confidence: 0,
+          disease: 'Unknown',
+          matched_drugs: [],
+          suggestions: [],
+          drug_interactions: [],
+          drug_details: {},
+          explanation: {}
+        };
+      }
+
+      const result: PredictionResponse = await response.json();
+      return result;
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const result: PredictionResponse = await response.json();
-    return result;
   } catch (err) {
     console.error('API Error:', err);
     return null;
@@ -126,13 +228,21 @@ export const predictAPI = async (
  * Upload a medical image for classification
  */
 export const imagePredictAPI = async (
-  file: File
+  file: File,
+  patientId?: string,
+  patientName?: string,
+  treatingDoctor?: string,
+  treatingDoctorId?: string
 ): Promise<ImagePredictionResponse | null> => {
   try {
     const formData = new FormData();
     formData.append('image', file);
+    if (patientId) formData.append('patient_id', patientId);
+    if (patientName) formData.append('patient_name', patientName);
+    if (treatingDoctor) formData.append('treating_doctor', treatingDoctor);
+    if (treatingDoctorId) formData.append('treating_doctor_id', treatingDoctorId);
 
-    const response = await fetch(`${BASE_URL}/image-predict`, {
+    const response = await fetch(`${BASE_URL}/upload-prescription`, {
       method: 'POST',
       body: formData
     });
@@ -140,14 +250,8 @@ export const imagePredictAPI = async (
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
       return {
-        error: errData.error || `Server returned status ${response.status}`,
-        classification: '',
-        confidence: 0,
-        severity: '',
-        description: '',
-        recommended_action: '',
-        differential_diagnosis: [],
-        disclaimer: ''
+        status: 'error',
+        error: errData.error || `Server returned status ${response.status}`
       };
     }
 
@@ -174,4 +278,50 @@ export const getModelInfoAPI = async (
   }
 };
 
-export default { predictAPI, imagePredictAPI, getModelInfoAPI };
+export const getAdminPatientsAPI = async (): Promise<{
+  status: string;
+  data: { patients: any[]; total_count: number };
+  error?: string;
+} | null> => {
+  try {
+    const response = await fetch(`${BASE_URL}/admin-patients`);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (err) {
+    console.error('Admin Patients API Error:', err);
+    return null;
+  }
+};
+
+export const downloadReportPDF = async (recordId: string): Promise<void> => {
+  try {
+    const response = await fetch(`${BASE_URL}/generate-pdf/${recordId}`);
+    if (!response.ok) throw new Error('Failed to generate report');
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `MedReport_${recordId.substring(0, 8)}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  } catch (err) {
+    console.error('PDF Download Error:', err);
+    alert('Failed to generate high-quality PDF report. Please try again.');
+  }
+};
+
+export const getHistoryAPI = async (email: string, role: string): Promise<{ status: string; history: any[] } | null> => {
+  try {
+    const response = await fetch(`${BASE_URL}/history?email=${email}&role=${role}`);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (err) {
+    console.error('History API Error:', err);
+    return null;
+  }
+};
+
+export default { predictAPI, imagePredictAPI, getModelInfoAPI, registerAPI, loginAPI, downloadReportPDF, getHistoryAPI };

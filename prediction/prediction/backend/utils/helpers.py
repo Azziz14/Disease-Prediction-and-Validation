@@ -19,7 +19,7 @@ try:
                     drug_map[disease] = []
                 drug_map[disease].append(drug)
 except FileNotFoundError:
-    print(f"Warning: Could not load mock drugs database at {csv_path}")
+    print(f"Warning: Could not load drugs database at {csv_path}")
 
 def validate_prescription(disease, prescription):
     words = prescription.lower().split()
@@ -31,11 +31,7 @@ def validate_prescription(disease, prescription):
         if match:
             matched.append(match[0])
 
-    # If dataset wasn't found or parsed, return mock fallback
-    if not valid_drugs:
-        valid_drugs = ["metformin", "insulin", "glipizide"]
-
     return {
         "matched_drugs": list(set(matched)),
-        "suggestions": valid_drugs[:3]
+        "suggestions": valid_drugs[:3] if valid_drugs else []
     }

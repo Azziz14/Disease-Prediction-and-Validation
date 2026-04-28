@@ -125,31 +125,35 @@ class NLPProcessorEnhanced:
     - Entity normalization
     - Drug interaction detection
     - Dosage and frequency extraction
+    - PERFORMANCE: LRU doc cache, optional fast mode
     """
 
     def __init__(self):
         print("Loading spaCy medical NLP model...")
+        import os
+        os.environ['SPACY_WARN_NO_MODEL'] = 'ignore'  # Suppress warnings
+        
+        # Always use lightweight sm model for speed
         try:
-            self.nlp = spacy.load("en_core_web_md")
+            self.nlp = spacy.load("en_core_web_sm", exclude=["parser", "tagger", "attribute_ruler"])
+            print("  [OK] spaCy en_core_web_sm loaded (lightweight)")
         except OSError:
-            try:
-                self.nlp = spacy.load("en_core_web_sm")
-                print("  [FALLBACK] Using en_core_web_sm (md not available)")
-            except OSError:
-                print("Downloading en_core_web_sm...")
-                import subprocess
-                subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"],
-                              capture_output=True)
-                self.nlp = spacy.load("en_core_web_sm")
+            print("Downloading en_core_web_sm...")
+            import subprocess
+            subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm", "--quiet"],
+                          capture_output=True)
+            self.nlp = spacy.load("en_core_web_sm", exclude=["parser", "tagger"])
 
-        # Zero-shot classification — works without fine-tuning on domain labels
+        # Zero-shot classification with cache_dir for offline
         print("Loading zero-shot medical text classifier...")
         self.medical_classifier = None
         self._is_zero_shot = False
         try:
             self.medical_classifier = hf_pipeline(
                 "zero-shot-classification",
-                model="facebook/bart-large-mnli"
+                model="facebook/bart-large-mnli",
+                trust_remote_code=True,
+                cache_dir="./hf_cache"  # Persist downloads
             )
             self._is_zero_shot = True
             print("  [OK] Zero-shot classifier loaded (BART-MNLI)")
@@ -158,20 +162,29 @@ class NLPProcessorEnhanced:
             try:
                 self.medical_classifier = hf_pipeline(
                     "text-classification",
-                    model="distilbert-base-uncased-finetuned-sst-2-english"
+                    model="distilbert-base-uncased-finetuned-sst-2-english",
+                    cache_dir="./hf_cache"
                 )
                 self._is_zero_shot = False
                 print("  -> Fallback to DistilBERT")
             except Exception as e2:
                 print(f"  [ERROR] All classifiers unavailable: {e2}")
 
-        # Semantic similarity model (optional)
+        # Semantic similarity: FAST MODE DISABLED BY DEFAULT
         self.similarity_model = None
-        try:
-            from sentence_transformers import SentenceTransformer
-            self.similarity_model = SentenceTransformer('all-MiniLM-L6-v2')
-        except ImportError:
-            print("  sentence-transformers not installed. Skipping.")
+        self.fast_mode = True  # Set False in config for full features
+        if not self.fast_mode:
+            try:
+                from sentence_transformers import SentenceTransformer
+                self.similarity_model = SentenceTransformer('all-MiniLM-L6-v2')
+                print("  [OK] Semantic embeddings loaded")
+            except ImportError:
+                print("  sentence-transformers not installed. Skipping.")
+
+        # PERFORMANCE: Doc processing cache (LRU-like dict, max 100)
+        from collections import OrderedDict
+        self.doc_cache = OrderedDict()
+        self.cache_max = 100
 
     def process_prescription(self, text: str) -> dict:
         """
@@ -182,8 +195,10 @@ class NLPProcessorEnhanced:
         4. Medical intent classification (BioBERT)
         5. Drug interaction detection
         6. Confidence calibration
+        - CACHED: Returns from cache if text identical
         """
-        if not text or len(text.strip()) == 0:
+        text = text.strip()
+        if not text:
             return {
                 "drugs": [],
                 "symptoms": [],
@@ -195,7 +210,15 @@ class NLPProcessorEnhanced:
                 "interaction_severity": "none"
             }
 
-        # 1. spaCy NER
+        # PERFORMANCE: Cache hit?
+        if text in self.doc_cache:
+            self.doc_cache.move_to_end(text)  # LRU
+            print("[NLP] Cache HIT")
+            return self.doc_cache[text]
+
+        print("[NLP] Processing (cache MISS)...")
+
+        # 1. spaCy NER (cached doc)
         doc = self.nlp(text.lower())
         ner_entities = {}
         
@@ -229,13 +252,14 @@ class NLPProcessorEnhanced:
         interactions = self._check_drug_interactions(all_drugs)
         interaction_severity = "high" if interactions else "none"
 
-        # 8. Overall prescription validity
-        is_valid = len(all_drugs) > 0 and intent_confidence > 0.4
-        overall_confidence = self._calibrate_confidence(
-            len(all_drugs), len(all_symptoms), intent_confidence
-        )
+        # 8. Determine if prescription is valid
+        is_valid = (len(all_drugs) > 0 or len(all_symptoms) > 0) and intent_confidence > 0.3
+        
+        # 9. Calculate overall confidence (weighted average)
+        overall_confidence = (intent_confidence + (1 if len(all_drugs) > 0 else 0) + (1 if len(all_symptoms) > 0 else 0)) / 3.0
 
-        return {
+        # Cache result (LRU eviction)
+        result = {
             "drugs": all_drugs,
             "drugs_detailed": drugs_with_confidence,
             "symptoms": all_symptoms,
@@ -253,6 +277,13 @@ class NLPProcessorEnhanced:
                 all_drugs, interactions, intent_confidence
             )
         }
+        
+        # LRU cache store/evict
+        self.doc_cache[text] = result
+        if len(self.doc_cache) > self.cache_max:
+            self.doc_cache.popitem(last=False)
+            
+        return result
 
     def _extract_drugs_enhanced(self, text, doc):
         """
@@ -474,47 +505,45 @@ class NLPProcessorEnhanced:
         """
         Semantic search over patient medical records using embeddings.
         If sentence-transformers is not available, falls back to keyword matching.
+        FAST MODE: Always keyword if enabled.
         """
         if not records:
             return []
 
-        # If similarity model available, use embeddings
-        if self.similarity_model is not None:
-            query_embedding = self.similarity_model.encode([query])[0]
-            
+        if self.fast_mode or self.similarity_model is None:
+            # Fast keyword fallback (always available)
+            query_words = set(query.lower().split())
             scored_records = []
+            
             for record in records:
-                # Combine relevant text fields for embedding
-                text_to_embed = f"{record.get('diagnosis', '')} {record.get('description', '')} {record.get('symptoms', '')}"
-                if not text_to_embed.strip():
-                    continue
+                score = 0
+                text_to_search = f"{record.get('diagnosis', '')} {record.get('description', '')} {record.get('symptoms', '')}".lower()
+                record_words = set(text_to_search.split())
+                
+                common_words = query_words.intersection(record_words)
+                score = len(common_words)
+                
+                if score > 0:
+                    scored_records.append((score, record))
                     
-                record_embedding = self.similarity_model.encode([text_to_embed])[0]
-                
-                # Cosine similarity
-                sim = np.dot(query_embedding, record_embedding) / (np.linalg.norm(query_embedding) * np.linalg.norm(record_embedding))
-                
-                if sim > 0.3: # Threshold for relevance
-                    scored_records.append((sim, record))
-            
             scored_records.sort(key=lambda x: x[0], reverse=True)
-            return [record for sim, record in scored_records]
+            return [record for score, record in scored_records[:5]]  # Limit results
+
+        # Full semantic (slow)
+        query_embedding = self.similarity_model.encode([query])[0]
         
-        # Fallback keyword matching
-        query_words = set(query.lower().split())
         scored_records = []
-        
         for record in records:
-            score = 0
-            text_to_search = f"{record.get('diagnosis', '')} {record.get('description', '')} {record.get('symptoms', '')}".lower()
-            record_words = set(text_to_search.split())
-            
-            common_words = query_words.intersection(record_words)
-            score = len(common_words)
-            
-            if score > 0:
-                scored_records.append((score, record))
+            text_to_embed = f"{record.get('diagnosis', '')} {record.get('description', '')} {record.get('symptoms', '')}"
+            if not text_to_embed.strip():
+                continue
                 
+            record_embedding = self.similarity_model.encode([text_to_embed])[0]
+            sim = np.dot(query_embedding, record_embedding) / (np.linalg.norm(query_embedding) * np.linalg.norm(record_embedding))
+            
+            if sim > 0.3:
+                scored_records.append((sim, record))
+        
         scored_records.sort(key=lambda x: x[0], reverse=True)
-        return [record for score, record in scored_records]
+        return [record for sim, record in scored_records[:5]]
 

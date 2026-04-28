@@ -369,3 +369,89 @@ class VoiceIntakeService:
             else:
                 summary.append(f"{key}: {val} {unit} (extracted from voice)")
         return summary
+
+    def detect_disease(self, text: str) -> str:
+        """
+        Intelligent autonomous disease detection from free-form voice text.
+        Uses weighted keyword & symptom proximity scoring to determine the
+        most likely clinical context without user intervention.
+        
+        Returns: 'diabetes', 'heart', or 'mental'
+        """
+        text_lower = text.lower()
+        
+        # Weighted keyword dictionaries — higher weight = stronger signal
+        DISEASE_SIGNALS = {
+            "diabetes": {
+                # Direct mentions (weight 10)
+                "diabetes": 10, "diabetic": 10, "type 2": 8, "type 1": 8,
+                # Core biomarkers (weight 6)
+                "glucose": 6, "blood sugar": 6, "sugar level": 6, "insulin": 6,
+                "hba1c": 7, "a1c": 7, "glycemic": 6, "hyperglycemia": 8,
+                # Symptoms (weight 4)
+                "frequent urination": 5, "thirsty": 4, "thirst": 4, "blurred vision": 4,
+                "weight loss": 3, "fatigue": 2, "numbness": 3, "tingling": 3,
+                # Related terms (weight 2-3)
+                "bmi": 3, "obesity": 3, "overweight": 3, "pancreas": 4,
+                "metformin": 7, "glipizide": 7, "endocrinologist": 6,
+                "sugar": 3, "carbohydrate": 2, "glycemia": 5,
+                "pedigree": 4, "pregnancies": 3, "skin thickness": 3,
+            },
+            "heart": {
+                # Direct mentions (weight 10)
+                "heart": 8, "cardiac": 10, "cardiovascular": 10, "heart disease": 10,
+                "heart attack": 10, "coronary": 9,
+                # Core biomarkers (weight 6)
+                "cholesterol": 6, "blood pressure": 5, "bp": 4, "systolic": 6,
+                "diastolic": 6, "ecg": 7, "ekg": 7, "electrocardiogram": 8,
+                # Symptoms (weight 4-5)
+                "chest pain": 7, "angina": 7, "shortness of breath": 5,
+                "palpitation": 6, "arrhythmia": 7, "irregular heartbeat": 7,
+                # Related terms
+                "statin": 6, "aspirin": 4, "atorvastatin": 7, "lisinopril": 7,
+                "metoprolol": 7, "amlodipine": 7,
+                "pulse": 3, "heart rate": 4, "tachycardia": 6, "bradycardia": 6,
+                "exercise angina": 7, "resting bp": 5,
+            },
+            "mental": {
+                # Direct mentions (weight 10)
+                "mental health": 10, "depression": 10, "anxiety": 10,
+                "mental illness": 10, "psychiatric": 9, "psychological": 8,
+                # Core signals (weight 5-7)
+                "stress": 5, "stressed": 5, "panic attack": 8, "panic": 5,
+                "insomnia": 6, "sleep disorder": 6, "bipolar": 9, "ptsd": 9,
+                "ocd": 8, "adhd": 7, "schizophrenia": 10,
+                # Symptoms (weight 3-5)
+                "sad": 4, "hopeless": 5, "worthless": 5, "suicide": 10, "suicidal": 10,
+                "can't sleep": 5, "sleep": 3, "nightmare": 4, "crying": 4,
+                "lonely": 4, "isolation": 5, "anxious": 6, "worry": 4, "worrying": 4,
+                "mood": 5, "mood swing": 6, "irritable": 4, "anger": 3,
+                # Related terms
+                "therapy": 5, "therapist": 5, "counseling": 5, "psychiatrist": 7,
+                "sertraline": 7, "fluoxetine": 7, "escitalopram": 7,
+                "social support": 4, "family history": 3, "work interfere": 5,
+                "stress level": 5, "burnout": 5,
+            }
+        }
+        
+        scores = {}
+        for disease, keywords in DISEASE_SIGNALS.items():
+            score = 0
+            for keyword, weight in keywords.items():
+                # Count occurrences and multiply by weight
+                count = text_lower.count(keyword)
+                if count > 0:
+                    score += weight * count
+            scores[disease] = score
+        
+        logger.info(f"[AUTO-DETECT] Disease scores: {scores}")
+        
+        # Pick highest score; if all zero, default to diabetes (most common)
+        best = max(scores, key=scores.get)
+        if scores[best] == 0:
+            logger.info("[AUTO-DETECT] No disease signals found, defaulting to diabetes")
+            return "diabetes"
+        
+        logger.info(f"[AUTO-DETECT] Detected disease: {best} (score: {scores[best]})")
+        return best
+

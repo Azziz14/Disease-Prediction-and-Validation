@@ -58,6 +58,7 @@ class AdvancedDataPreprocessor:
         3. Handle missing values
         4. Detect and handle outliers
         5. Feature engineering
+        6. Encode categorical features
         6. Feature selection
         7. Proper train/val/test split with stratification
         8. Scaling
@@ -66,6 +67,10 @@ class AdvancedDataPreprocessor:
 
         # 1. Load data
         df = pd.read_csv(dataset_path)
+        # Convert all StringDtype columns to object dtype for sklearn compatibility
+        for col in df.columns:
+            if pd.api.types.is_string_dtype(df[col]):
+                df[col] = df[col].astype(object)
         print(f"[OK] Loaded {len(df)} samples with {len(df.columns)} features")
 
         # 2. Data validation
@@ -77,12 +82,49 @@ class AdvancedDataPreprocessor:
         # 4. Handle biologically invalid zeros
         df = self._handle_invalid_zeros(df)
 
+        # --- Encode target column if categorical (e.g., 'Positive'/'Negative') ---
+        if df[target_col].dtype == 'object' or not np.issubdtype(df[target_col].dtype, np.number):
+            unique_vals = df[target_col].unique()
+            if len(unique_vals) == 2:
+                # Binary classification: map to 0/1
+                mapping = {val: i for i, val in enumerate(sorted(unique_vals))}
+                print(f"  [OK] Encoded target column '{target_col}' as binary: {mapping}")
+                df[target_col] = df[target_col].map(mapping)
+            else:
+                # Multi-class: use LabelEncoder
+                from sklearn.preprocessing import LabelEncoder
+                le = LabelEncoder()
+                df[target_col] = le.fit_transform(df[target_col])
+                print(f"  [OK] Label-encoded target column '{target_col}' with classes: {list(le.classes_)}")
+
         # 5. Outlier detection and handling
         if handle_outliers:
             df = self._handle_outliers(df)
 
         # 6. Feature engineering
         df = self._engineer_features(df)
+
+        # 7. Encode categorical features (excluding target)
+        from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+        cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+        if target_col in cat_cols:
+            cat_cols = [col for col in cat_cols if col != target_col]
+        if cat_cols:
+            for col in cat_cols:
+                n_unique = df[col].nunique()
+                if n_unique == 2:
+                    # Binary: Label encode
+                    le = LabelEncoder()
+                    df[col] = le.fit_transform(df[col])
+                else:
+                    # Multi-category: One-hot encode
+                    try:
+                        ohe = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+                    except TypeError:
+                        ohe = OneHotEncoder(sparse=False, handle_unknown='ignore')
+                    ohe_df = pd.DataFrame(ohe.fit_transform(df[[col]]), columns=[f"{col}_{cat}" for cat in ohe.categories_[0]])
+                    df = pd.concat([df.drop(columns=[col]), ohe_df], axis=1)
+            print(f"  [OK] Encoded categorical columns: {cat_cols}")
 
         # 7. Split into train/val/test BEFORE scaling
         X = df.drop(columns=[target_col])
@@ -101,11 +143,25 @@ class AdvancedDataPreprocessor:
 
         print(f"[OK] Train: {len(X_train)} | Val: {len(X_val)} | Test: {len(X_test)}")
 
+
         # 8. Feature selection (on train set ONLY)
         if select_features:
-            X_train, X_val, X_test = self._select_features(
-                X_train, y_train, X_val, X_test
-            )
+            # Optionally use RFE for feature selection
+            use_rfe = True
+            if use_rfe:
+                from sklearn.feature_selection import RFE
+                from sklearn.ensemble import RandomForestClassifier
+                n_features_to_select = min(X_train.shape[1], 15)
+                rfe = RFE(RandomForestClassifier(n_estimators=100, random_state=42), n_features_to_select=n_features_to_select)
+                X_train = rfe.fit_transform(X_train, y_train)
+                X_val = rfe.transform(X_val)
+                X_test = rfe.transform(X_test)
+                self.selected_features = list(np.array(X.columns)[rfe.get_support()])
+                print(f"    - RFE selected {n_features_to_select} features: {self.selected_features}")
+            else:
+                X_train, X_val, X_test = self._select_features(
+                    X_train, y_train, X_val, X_test
+                )
 
         # 9. Scaling (fit on train, transform all)
         X_train_scaled = self.scaler.fit_transform(X_train)
@@ -180,6 +236,7 @@ class AdvancedDataPreprocessor:
     def _handle_outliers(self, df):
         """
         Detect and handle outliers using IQR + Z-score methods.
+        Ensure capped values match the original dtype (int or float).
         """
         print(f"  Outlier detection:")
         outlier_counts = {}
@@ -192,6 +249,12 @@ class AdvancedDataPreprocessor:
             IQR = Q3 - Q1
             lower_bound = Q1 - 1.5 * IQR
             upper_bound = Q3 + 1.5 * IQR
+
+            # Cast bounds to column dtype if needed
+            col_dtype = df[col].dtype
+            if np.issubdtype(col_dtype, np.integer):
+                lower_bound = int(np.floor(lower_bound))
+                upper_bound = int(np.ceil(upper_bound))
 
             outliers_iqr = (df[col] < lower_bound) | (df[col] > upper_bound)
             outlier_counts[col] = outliers_iqr.sum()

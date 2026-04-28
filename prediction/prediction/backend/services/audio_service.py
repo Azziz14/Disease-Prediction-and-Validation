@@ -126,7 +126,7 @@ class AudioService:
             transcription_request = {
                 "audio_url": audio_url,
                 "language_code": "en",
-                "speech_model": "best"  # Most accurate model
+                "speech_models": ["nano"]  # Fast edge-optimized model for speed
             }
             
             submit_response = requests.post(

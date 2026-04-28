@@ -34,33 +34,33 @@ LABELS = [
 LABEL_DETAILS = {
     "Benign Nevus": {
         "severity": "Low",
-        "description": "Common mole, typically harmless. Regular monitoring recommended.",
-        "action": "No immediate action required. Monitor for changes in size, shape, or color."
+        "description": "Common mole, typically harmless. Regular visual monitoring mandatory.",
+        "action": "CLINICAL DIRECTIVE: No immediate intervention. Implement monthly visual self-audit for ABCDE changes."
     },
     "Melanoma Suspect": {
         "severity": "Critical",
-        "description": "Potential melanoma detected. Immediate dermatological consultation required.",
-        "action": "URGENT: Schedule biopsy and dermatology referral within 48 hours."
+        "description": "Potential melanoma detected. High-risk malignant profiling.",
+        "action": "URGENT PROTOCOL: Immediate dermatological excision and biopsy mandatory within 48 hours."
     },
     "Dermatofibroma": {
         "severity": "Low",
-        "description": "Benign fibrous nodule. Generally harmless.",
-        "action": "No treatment needed unless symptomatic. Surgical removal optional."
+        "description": "Benign fibrous nodule. Confirmed harmless.",
+        "action": "DIRECTIVE: No treatment required unless symptomatic. Elective excision optional."
     },
     "Basal Cell Carcinoma": {
         "severity": "Moderate",
-        "description": "Most common type of skin cancer. Slow-growing, rarely metastasizes.",
-        "action": "Schedule dermatology appointment for evaluation and possible excision."
+        "description": "Persistent skin cancer detected. Slow-growing but requiring removal.",
+        "action": "CLINICAL DIRECTIVE: Schedule surgical excision or cryotherapy within 14 days."
     },
     "Actinic Keratosis": {
         "severity": "Moderate",
-        "description": "Pre-cancerous lesion from sun damage. May progress to squamous cell carcinoma.",
-        "action": "Treatment recommended: cryotherapy, topical medications, or photodynamic therapy."
+        "description": "Pre-cancerous sun-induced lesion. High progression risk.",
+        "action": "DIRECTIVE: Immediate intervention via cryotherapy or topical 5-FU protocol mandatory."
     },
     "Vascular Lesion": {
         "severity": "Low",
-        "description": "Blood vessel-related skin condition. Most are benign.",
-        "action": "Monitor for changes. Laser treatment available if cosmetically concerning."
+        "description": "Benign blood-vessel abnormality. Non-malignant.",
+        "action": "PROTOCOL: Monitor for structural changes. Laser intervention elective for cosmetic improvement."
     }
 }
 

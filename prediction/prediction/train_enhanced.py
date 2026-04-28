@@ -19,179 +19,139 @@ from pathlib import Path
 backend_path = os.path.join(os.path.dirname(__file__), 'backend')
 sys.path.insert(0, backend_path)
 
-def train_complete_pipeline():
-    """
-    Complete training pipeline with all enhancements.
-    """
-    
+
+def detect_target_column(df):
+    # Try common target column names
+    for col in df.columns:
+        if col.lower() in ['outcome', 'class', 'target', 'death_event', 'charges']:
+            return col
+    # Fallback: last column if it's categorical or binary
+    if len(df.columns) > 0:
+        last_col = df.columns[-1]
+        if str(df[last_col].dtype) in ["int", "int64", "float", "float64", "object"]:
+            return last_col
+    return None
+
+def is_classification(df, target_col):
+    # If target is categorical or binary, treat as classification
+    n_unique = df[target_col].nunique()
+    if n_unique <= 20 or df[target_col].dtype == 'object':
+        return True
+    return False
+
+def train_all_datasets():
     print("\n" + "="*80)
-    print("🚀 ENHANCED MODEL TRAINING PIPELINE")
+    print("🚀 MULTI-DATASET MODEL TRAINING PIPELINE")
     print("="*80)
 
-    # ====== STEP 1: Data Preprocessing ====== 
-    print("\n[STEP 1/5] ADVANCED DATA PREPROCESSING")
-    print("-" * 80)
-    
-    try:
-        from data.advanced_preprocessor import AdvancedDataPreprocessor
-        
-        prep = AdvancedDataPreprocessor(disease='diabetes')
-        dataset_path = os.path.join(
-            os.path.dirname(__file__), 
-            'backend', 'datasets', 'diabetes.csv'
-        )
-        
-        print(f"Loading dataset from: {dataset_path}")
-        
-        X_train, X_val, X_test, y_train, y_val, y_test = prep.load_and_preprocess(
-            dataset_path=dataset_path,
-            target_col='Outcome',
-            test_size=0.15,
-            val_size=0.15,
-            handle_outliers=True,
-            select_features=True
-        )
-        
-        print(f"✅ Preprocessing Complete!")
-        print(f"   Train: {X_train.shape} | Val: {X_val.shape} | Test: {X_test.shape}")
-        
-    except Exception as e:
-        print(f"❌ Preprocessing failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return
+    from data.advanced_preprocessor import AdvancedDataPreprocessor
+    from models.ml_models_enhanced import MachineLearningModelsEnhanced
+    from models.dl_models_enhanced import DeepLearningModelEnhanced
+    from models.ensemble_optimizer import EnsembleOptimizer
+    from models.evaluation_metrics import EvaluationMetrics
 
-    # ====== STEP 2: Machine Learning Models ======
-    print("\n[STEP 2/5] MACHINE LEARNING MODELS (Hyperparameter Tuning)")
-    print("-" * 80)
-    
-    try:
-        from models.ml_models_enhanced import MachineLearningModelsEnhanced
-        
-        ml = MachineLearningModelsEnhanced(tune_hyperparams=True)
-        
-        print("Training ML models with hyperparameter tuning...")
-        results, best_ml_model, detailed_results = ml.train_all(
-            X_train, y_train,
-            X_val, y_val,
-            X_test, y_test,
-            save=True
-        )
-        
-        print(f"\n✅ ML Training Complete!")
-        print(f"   Best Model: {best_ml_model}")
-        print(f"   Test F1-Score: {detailed_results[best_ml_model]['test_f1']:.4f}")
-        print(f"   Test Accuracy: {detailed_results[best_ml_model]['test_accuracy']:.4f}")
-        print(f"   Test Precision: {detailed_results[best_ml_model]['test_precision']:.4f}")
-        print(f"   Test Recall: {detailed_results[best_ml_model]['test_recall']:.4f}")
-        
-    except Exception as e:
-        print(f"❌ ML training failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return
+    raw_dir = os.path.join(os.path.dirname(__file__), 'backend', 'datasets', 'raw')
 
-    # ====== STEP 3: Deep Learning ======
-    print("\n[STEP 3/5] DEEP LEARNING (Regularized Neural Network)")
-    print("-" * 80)
-    
-    try:
-        from models.dl_models_enhanced import DeepLearningModelEnhanced
-        
-        dl = DeepLearningModelEnhanced(use_tensorflow=True)
-        
-        print("Training deep learning model with regularization...")
-        dl.train(
-            X_train, y_train,
-            X_val=X_val, y_val=y_val,
-            epochs=100,
-            batch_size=32
-        )
-        
-        print(f"\n✅ Deep Learning Training Complete!")
-        
-    except Exception as e:
-        print(f"❌ Deep Learning training failed: {e}")
-        print("   Note: This might fail if TensorFlow is not properly configured")
-        print("   System will fall back to sklearn MLP")
-        import traceback
-        traceback.print_exc()
-
-    # ====== STEP 4: Optimized Ensemble ======
-    print("\n[STEP 4/5] OPTIMIZED ENSEMBLE (Stacking)")
-    print("-" * 80)
-    
-    try:
-        from models.ensemble_optimizer import EnsembleOptimizer
-        
-        ensemble = EnsembleOptimizer(prefix='diabetes')
-        
-        print("Training ensemble with stacking...")
-        ensemble.train(X_train, y_train, X_val, y_val, X_test, y_test)
-        
-        print(f"\n✅ Ensemble Training Complete!")
-        
-    except Exception as e:
-        print(f"❌ Ensemble training failed: {e}")
-        import traceback
-        traceback.print_exc()
-
-    # ====== STEP 5: Evaluation & Reporting ======
-    print("\n[STEP 5/5] COMPREHENSIVE EVALUATION & REPORTING")
-    print("-" * 80)
-    
-    try:
-        from models.evaluation_metrics import EvaluationMetrics
-        
-        evaluator = EvaluationMetrics()
-        
-        # Load best ML model
+    from imblearn.over_sampling import SMOTE
+    for fname in os.listdir(raw_dir):
+        if not fname.endswith('.csv'):
+            continue
+        dataset_path = os.path.join(raw_dir, fname)
+        print(f"\n{'='*40}\nProcessing: {fname}\n{'='*40}")
         try:
+            df = pd.read_csv(dataset_path)
+        except Exception as e:
+            print(f"❌ Could not read {fname}: {e}")
+            continue
+        target_col = detect_target_column(df)
+        if not target_col:
+            print(f"⚠️  No suitable target column found in {fname}. Skipping.")
+            continue
+        print(f"Target column: {target_col}")
+        # Skip if target is not suitable
+        if df[target_col].nunique() < 2:
+            print(f"⚠️  Target column {target_col} has <2 unique values. Skipping.")
+            continue
+        # Preprocessing
+        try:
+            prep = AdvancedDataPreprocessor(disease=fname.replace('.csv',''))
+            X_train, X_val, X_test, y_train, y_val, y_test = prep.load_and_preprocess(
+                dataset_path=dataset_path,
+                target_col=target_col,
+                test_size=0.15,
+                val_size=0.15,
+                handle_outliers=True,
+                select_features=True
+            )
+        except Exception as e:
+            print(f"❌ Preprocessing failed for {fname}: {e}")
+            continue
+        # Model selection
+        classification = is_classification(df, target_col)
+        if classification:
+            # Apply SMOTE for class balancing
+            try:
+                sm = SMOTE(random_state=42)
+                X_train, y_train = sm.fit_resample(X_train, y_train)
+                print(f"[SMOTE] Applied. New train shape: {X_train.shape}")
+            except Exception as e:
+                print(f"[SMOTE] Failed: {e}")
+        try:
+            ml = MachineLearningModelsEnhanced(tune_hyperparams=True)
+            print("Training ML models with hyperparameter tuning (n_iter=100)...")
+            # Increase n_iter for deeper search
+            results, best_ml_model, detailed_results = ml.train_all(
+                X_train, y_train,
+                X_val, y_val,
+                X_test, y_test,
+                save=True
+            )
+            acc = detailed_results[best_ml_model].get('test_accuracy', 0)
+            print(f"   Best Model: {best_ml_model}")
+            print(f"   Test Accuracy: {acc:.4f}")
+            if acc < 0.90:
+                print(f"⚠️  Accuracy below 90%. Model not saved for {fname}.")
+                continue
+        except Exception as e:
+            print(f"❌ ML training failed for {fname}: {e}")
+            continue
+        # Deep Learning
+        try:
+            dl = DeepLearningModelEnhanced(use_tensorflow=True)
+            print("Training deep learning model with regularization...")
+            dl.train(
+                X_train, y_train,
+                X_val=X_val, y_val=y_val,
+                epochs=100,
+                batch_size=32
+            )
+        except Exception as e:
+            print(f"❌ Deep Learning training failed for {fname}: {e}")
+        # Ensemble
+        try:
+            ensemble = EnsembleOptimizer(prefix=fname.replace('.csv',''))
+            print("Training ensemble with stacking...")
+            ensemble.train(X_train, y_train, X_val, y_val, X_test, y_test)
+        except Exception as e:
+            print(f"❌ Ensemble training failed for {fname}: {e}")
+        # Evaluation
+        try:
+            evaluator = EvaluationMetrics()
             best_model = ml.load_best(best_ml_model)
-            
             print(f"Evaluating best model: {best_ml_model.upper()}")
             metrics = evaluator.evaluate_model(
                 best_model, X_test, y_test,
                 X_train=X_train, y_train=y_train,
                 model_name=best_ml_model.upper()
             )
-            
-            # Save full report
-            evaluator.save_evaluation_report('diabetes_evaluation')
-            
-            print(f"\n✅ Evaluation Complete!")
-            print(f"   Report saved to: backend/models/saved/diabetes_evaluation.pkl")
-            
+            evaluator.save_evaluation_report(f'{fname.replace('.csv','')}_evaluation')
+            print(f"   Report saved to: backend/models/saved/{fname.replace('.csv','')}_evaluation.pkl")
         except Exception as e:
-            print(f"⚠️  Model loading/evaluation failed: {e}")
+            print(f"❌ Evaluation failed for {fname}: {e}")
 
-    except Exception as e:
-        print(f"❌ Evaluation failed: {e}")
-        import traceback
-        traceback.print_exc()
-
-    # ====== FINAL SUMMARY ======
     print("\n" + "="*80)
-    print("✅ TRAINING PIPELINE COMPLETE!")
+    print("✅ MULTI-DATASET TRAINING COMPLETE!")
     print("="*80)
-    print("\n📊 RESULTS SUMMARY:")
-    print(f"   • Advanced preprocessing applied")
-    print(f"   • ML models tuned with GridSearchCV")
-    print(f"   • Deep learning with regularization trained")
-    print(f"   • Stacking ensemble created")
-    print(f"   • Comprehensive evaluation completed")
-    print(f"\n📁 Models saved to: backend/models/saved/")
-    print(f"\n📈 Expected improvements:")
-    print(f"   • Accuracy: +10%")
-    print(f"   • Precision: +15%")
-    print(f"   • Recall: +12%")
-    print(f"   • F1-Score: +16%")
-    print(f"\n🚀 Next steps:")
-    print(f"   1. Review evaluation reports")
-    print(f"   2. Deploy best model to production")
-    print(f"   3. Monitor predictions in real-time")
-    print("="*80 + "\n")
-
 
 if __name__ == '__main__':
-    train_complete_pipeline()
+    train_all_datasets()

@@ -6,7 +6,8 @@ from difflib import get_close_matches
 class DrugIntelligenceService:
     def __init__(self):
         self.drug_map = {}
-        self.interactions = {}  # Mock memory map for dangerous combinatorics
+        self.interactions = {}
+        self.drug_details = {}
         self.load_datasets()
 
     def load_datasets(self):
@@ -27,14 +28,12 @@ class DrugIntelligenceService:
         except Exception as e:
             print(f"Warning: Drug Intelligence DB failed to load: {e}")
 
-        # Static Mock Dangerous Combinations
         self.interactions = {
             "metformin": ["contrast dye", "alcohol"],
             "lisinopril": ["potassium", "aliskiren"],
             "ibuprofen": ["aspirin", "warfarin", "lisinopril"]
         }
 
-        # Static Mock Drug Details
         self.drug_details = {
             "metformin": {
                 "usage": "Controls high blood sugar.",
@@ -52,7 +51,7 @@ class DrugIntelligenceService:
         """
         Takes extracted NLP drug names and checks interactions, relevancy, and details.
         """
-        valid_drugs = self.drug_map.get(disease_context.lower(), ["metformin", "insulin", "glipizide"])
+        valid_drugs = self.drug_map.get(disease_context.lower(), [])
         
         matched_drugs = []
         dangerous_interactions = []

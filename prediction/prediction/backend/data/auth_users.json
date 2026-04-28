@@ -1,0 +1,38 @@
+{
+  "meher@gmail.com": {
+    "user_id": "usr_24550ed9f281",
+    "email": "meher@gmail.com",
+    "name": "Meher",
+    "role": "patient",
+    "password_hash": "scrypt:32768:8:1$GER3qgxOQgzeVTgd$5538b784613fe1df08f4f5356159be49d17313b5708c5e27ab11862cb22fa7ef307c5f1b8c5615e59d019669678d2b5625b72fc6a5897e22682ac774defaca0e",
+    "created_at": "2026-04-21T19:46:07.102786",
+    "_id": "69e7d3ff2e4ce2c569eb3133"
+  },
+  "vidushi@gmail.com": {
+    "user_id": "usr_123a0ab0322d",
+    "email": "vidushi@gmail.com",
+    "name": "Vidushi",
+    "role": "patient",
+    "password_hash": "scrypt:32768:8:1$XnsU8WLLie4sgOyx$132970c9852009a618716c97d2630172c4cd0544c6095f768ef1bba5589382be428bf73c4616785cdfcc571e06b8e6a63b8a8790782ac2c46f6796f5a500da78",
+    "created_at": "2026-04-21T19:52:04.574125",
+    "_id": "69e7d5642e4ce2c569eb3134"
+  },
+  "admin@123": {
+    "user_id": "usr_0e821b3b2cc9",
+    "email": "admin@123",
+    "name": "System Administrator",
+    "role": "admin",
+    "password_hash": "scrypt:32768:8:1$Pivu40Fq9rasKNM7$07ae7ce098cd50ead14ec326f53b94759b5904db419c4443b92fcd8acd04bf83126e285b4ce3e1618b93ee1d3833eb2d9b42f5458d4f0999630cbc06ae829abd",
+    "created_at": "2026-04-21T19:56:10.229917",
+    "_id": "69e7d65ac67f76fb69869390"
+  },
+  "aziz@gmail.com": {
+    "user_id": "usr_d1c821205cd0",
+    "email": "aziz@gmail.com",
+    "name": "Aziz",
+    "role": "patient",
+    "password_hash": "scrypt:32768:8:1$WHQHLGruApUcPgQU$e010a1dafda287e4948943509c8654418b1882f1e86a40322860476825ef085afafd58db00c43f2d47c560081a4901b7d3316ddfeb4d9d32f4e1ab2b873ead7a",
+    "created_at": "2026-04-21T20:02:45.435896",
+    "_id": "69e7d7e5ed65d584988e3f18"
+  }
+}

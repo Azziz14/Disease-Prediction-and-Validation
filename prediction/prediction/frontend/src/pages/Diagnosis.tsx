@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { predictAPI } from '../services/api';
 import { usePatientData } from '../hooks/usePatientData';
+import { useAuth } from '../context/AuthContext';
 
 import CyberNeuralPath from '../components/ui/CyberNeuralPath';
 import CyberAIWaveform from '../components/ui/CyberAIWaveform';
@@ -22,11 +24,12 @@ import {
 interface WizardStep {
   key: string;
   label: string;
-  type: 'number' | 'select' | 'textarea' | 'select-numeric';
+  type: 'number' | 'select' | 'textarea' | 'select-numeric' | 'text';
   icon: React.ReactNode;
   placeholder?: string;
   options?: { value: string; label: string }[];
   hint?: string;
+  condition?: string;
 }
 
 const DISEASE_SELECTOR: WizardStep = {
@@ -42,26 +45,33 @@ const PRESCRIPTION_STEP: WizardStep = {
 
 const DISEASE_STEPS: Record<string, WizardStep[]> = {
   diabetes: [
-    { key: 'glucose', label: 'Glucose Level (mg/dL)', type: 'number', icon: <Activity className="text-[var(--neon-blue)]" />, hint: 'Normal: 70–100 | Pre-diabetic: 100–125 | Diabetic: 126+', placeholder: 'e.g. 120' },
-    { key: 'bloodPressure', label: 'Blood Pressure (mmHg)', type: 'number', icon: <HeartPulse className="text-[var(--neon-green)]" />, hint: 'Diastolic. Normal: 60–80 | Elevated: 80–90', placeholder: 'e.g. 72' },
-    { key: 'bmi', label: 'Body Mass Index (BMI)', type: 'number', icon: <Ruler className="text-[var(--neon-blue)]" />, hint: 'Normal: 18.5–25 | Overweight: 25–30 | Obese: 30+', placeholder: 'e.g. 28.5' },
+    { key: 'treatingDoctor', label: 'Treating Physician Name', type: 'text', icon: <Stethoscope className="text-[var(--neon-green)]" />, placeholder: 'Enter your doctor\'s name' },
+    { key: 'patientName', label: 'Patient Name', type: 'text', icon: <Users className="text-[var(--neon-blue)]" />, placeholder: 'Enter patient name' },
+    { key: 'biologicalSex', label: 'Biological Sex', type: 'select-numeric', icon: <Users className="text-[var(--neon-blue)]" />, options: [{ value: '1', label: 'Male' }, { value: '0', label: 'Female' }] },
+    { key: 'pregnancies', label: 'Pregnancies', type: 'number', icon: <Baby className="text-[var(--neon-purple)]" />, placeholder: 'e.g. 2' },
+    { key: 'glucose', label: 'Glucose Level (mg/dL)', type: 'number', icon: <Activity className="text-[var(--neon-blue)]" />, hint: 'Normal: 70-100 | Pre-diabetic: 100-125 | Diabetic: 126+', placeholder: 'e.g. 120' },
+    { key: 'bloodPressure', label: 'Blood Pressure (mmHg)', type: 'number', icon: <HeartPulse className="text-[var(--neon-green)]" />, hint: 'Diastolic. Normal: 60-80 | Elevated: 80-90', placeholder: 'e.g. 72' },
+    { key: 'skinThickness', label: 'Triceps Skin Thickness (mm)', type: 'number', icon: <Ruler className="text-[var(--neon-blue)]" />, hint: 'Normal: 10-50 mm', placeholder: 'e.g. 35' },
+    { key: 'insulin', label: 'Insulin Level (µU/mL)', type: 'number', icon: <Syringe className="text-[var(--neon-green)]" />, hint: 'Normal: 16-166 µU/mL', placeholder: 'e.g. 100' },
+    { key: 'bmi', label: 'Body Mass Index (BMI)', type: 'number', icon: <Ruler className="text-[var(--neon-blue)]" />, hint: 'Normal: 18.5-25 | Overweight: 25-30 | Obese: 30+', placeholder: 'e.g. 28.5' },
+    { key: 'pedigree', label: 'Diabetes Pedigree Function', type: 'number', icon: <Hash className="text-[var(--neon-green)]" />, hint: 'Likelihood based on family history (e.g. 0.08 - 2.42)', placeholder: 'e.g. 0.47' },
     { key: 'age', label: 'Patient Age', type: 'number', icon: <Calendar className="text-[var(--neon-purple)]" />, placeholder: 'e.g. 45' },
-    { key: 'insulin', label: 'Insulin Level (μU/mL)', type: 'number', icon: <Syringe className="text-[var(--neon-green)]" />, hint: 'Normal: 16–166 μU/mL', placeholder: 'e.g. 100' },
-    { key: 'skinThickness', label: 'Skin Thickness (mm)', type: 'number', icon: <Droplet className="text-[var(--neon-blue)]" />, hint: 'Triceps skin fold thickness', placeholder: 'e.g. 29' },
-    { key: 'pregnancies', label: 'Number of Pregnancies', type: 'number', icon: <Baby className="text-[var(--neon-purple)]" />, placeholder: 'e.g. 2' },
-    { key: 'dpf', label: 'Diabetes Pedigree Function', type: 'number', icon: <Hash className="text-[var(--neon-green)]" />, hint: 'Genetic diabetes influence score (0.0 – 2.5)', placeholder: 'e.g. 0.627' },
   ],
   heart: [
+    { key: 'treatingDoctor', label: 'Treating Physician Name', type: 'text', icon: <Stethoscope className="text-[var(--neon-green)]" />, placeholder: 'Enter your doctor\'s name' },
+    { key: 'patientName', label: 'Patient Name', type: 'text', icon: <Users className="text-[var(--neon-blue)]" />, placeholder: 'Enter patient name' },
     { key: 'age', label: 'Patient Age', type: 'number', icon: <Calendar className="text-[var(--neon-purple)]" />, placeholder: 'e.g. 55' },
     { key: 'sex', label: 'Biological Sex', type: 'select-numeric', icon: <Users className="text-[var(--neon-blue)]" />, options: [{ value: '1', label: 'Male' }, { value: '0', label: 'Female' }] },
     { key: 'chestPain', label: 'Chest Pain Type', type: 'select-numeric', icon: <ShieldAlert className="text-[var(--neon-green)]" />, options: [{ value: '0', label: 'Typical Angina' }, { value: '1', label: 'Atypical Angina' }, { value: '2', label: 'Non-Anginal Pain' }, { value: '3', label: 'Asymptomatic' }] },
-    { key: 'restingBP', label: 'Resting Blood Pressure (mmHg)', type: 'number', icon: <HeartPulse className="text-[var(--neon-green)]" />, hint: 'Normal: <120 | Elevated: 120–139', placeholder: 'e.g. 130' },
-    { key: 'cholesterol', label: 'Serum Cholesterol (mg/dL)', type: 'number', icon: <Flame className="text-[var(--neon-blue)]" />, hint: 'Desirable: <200 | Borderline: 200–239', placeholder: 'e.g. 240' },
+    { key: 'restingBP', label: 'Resting Blood Pressure (mmHg)', type: 'number', icon: <HeartPulse className="text-[var(--neon-green)]" />, hint: 'Normal: <120 | Elevated: 120-139', placeholder: 'e.g. 130' },
+    { key: 'cholesterol', label: 'Serum Cholesterol (mg/dL)', type: 'number', icon: <Flame className="text-[var(--neon-blue)]" />, hint: 'Desirable: <200 | Borderline: 200-239', placeholder: 'e.g. 240' },
     { key: 'fastingBS', label: 'Fasting Blood Sugar > 120?', type: 'select-numeric', icon: <Gauge className="text-[var(--neon-purple)]" />, options: [{ value: '1', label: 'Yes (> 120 mg/dL)' }, { value: '0', label: 'No (≤ 120 mg/dL)' }] },
-    { key: 'maxHR', label: 'Maximum Heart Rate Achieved', type: 'number', icon: <Zap className="text-[var(--neon-green)]" />, hint: 'Typical range: 60–220 bpm', placeholder: 'e.g. 150' },
+    { key: 'maxHR', label: 'Maximum Heart Rate Achieved', type: 'number', icon: <Zap className="text-[var(--neon-green)]" />, hint: 'Typical range: 60-220 bpm', placeholder: 'e.g. 150' },
     { key: 'exerciseAngina', label: 'Exercise-Induced Angina?', type: 'select-numeric', icon: <Dumbbell className="text-[var(--neon-blue)]" />, options: [{ value: '1', label: 'Yes' }, { value: '0', label: 'No' }] },
   ],
   mental: [
+    { key: 'treatingDoctor', label: 'Treating Physician Name', type: 'text', icon: <Stethoscope className="text-[var(--neon-green)]" />, placeholder: 'Enter your doctor\'s name' },
+    { key: 'patientName', label: 'Patient Name', type: 'text', icon: <Users className="text-[var(--neon-blue)]" />, placeholder: 'Enter patient name' },
     { key: 'age', label: 'Patient Age', type: 'number', icon: <Calendar className="text-[var(--neon-purple)]" />, placeholder: 'e.g. 30' },
     { key: 'gender', label: 'Gender', type: 'select-numeric', icon: <Users className="text-[var(--neon-blue)]" />, options: [{ value: '0', label: 'Male' }, { value: '1', label: 'Female' }, { value: '2', label: 'Non-Binary / Other' }] },
     { key: 'familyHistory', label: 'Family History of Mental Illness?', type: 'select-numeric', icon: <Hash className="text-[var(--neon-green)]" />, options: [{ value: '1', label: 'Yes' }, { value: '0', label: 'No' }] },
@@ -75,9 +85,26 @@ const DISEASE_STEPS: Record<string, WizardStep[]> = {
 
 // Build the features array for the backend (always 8 numbers)
 function buildPayload(disease: string, features: Record<string, any>) {
+  if (disease === 'diabetes') {
+    // Force 0 pregnancies for males to maintain model input integrity
+    const pregCount = (features.biologicalSex === '1') ? 0 : Number(features.pregnancies);
+    return [
+      pregCount,
+      Number(features.glucose),
+      Number(features.bloodPressure),
+      Number(features.skinThickness),
+      Number(features.insulin),
+      Number(features.bmi),
+      Number(features.pedigree),
+      Number(features.age)
+    ];
+  }
+  
   const steps = DISEASE_STEPS[disease];
-  // Map feature values in step order to produce the 8-number array
-  return steps.map(step => Number(features[step.key]) || 0);
+  // Filter out metadata steps (like name) for the ML payload
+  return steps
+    .filter(step => step.type !== 'text' && step.type !== 'textarea')
+    .map(step => Number(features[step.key]) || 0);
 }
 
 // Get default features for a given disease
@@ -105,19 +132,99 @@ const slideVariants = {
   },
   exit: (dir: Direction) => ({
     opacity: 0,
-    y: dir === 'forward' ? -60 : 60,
-    scale: 1.05,
-    filter: 'blur(8px)',
+    y: dir === 'forward' ? -40 : 40,
+    scale: 1.02,
+    filter: 'blur(10px)',
+    transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] }
   }),
 };
 
 const Diagnosis: React.FC = () => {
   const { addRecord } = usePatientData();
+  const { user } = useAuth();
+  const location = useLocation();
+  const [targetPatientId, setTargetPatientId] = useState<string | null>(null);
+  const [assignedPhysician, setAssignedPhysician] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<'structured' | 'image' | 'voice'>('structured');
   const [currentStep, setCurrentStep] = useState(0);
   const [direction, setDirection] = useState<Direction>('forward');
-  const [features, setFeatures] = useState<Record<string, any>>(getDefaultFeatures('diabetes'));
+  const [features, setFeatures] = useState<Record<string, any>>(() => {
+    const initial = getDefaultFeatures('diabetes');
+    if (user && user.role === 'patient') {
+      initial.patientName = user.name;
+    }
+    return initial;
+  });
+
+  // Build the full wizard steps dynamically: disease selector + disease-specific inputs + prescription
+  const wizardSteps = useMemo(() => {
+    let diseaseInputs = DISEASE_STEPS[features.disease] || DISEASE_STEPS.diabetes;
+    
+    // SURGICAL REMOVAL: For patients, identity fields are completely removed from the wizard
+    if (user && user.role === 'patient') {
+      diseaseInputs = diseaseInputs.filter(step => 
+        step.key !== 'treatingDoctor' && step.key !== 'patientName'
+      );
+    }
+    
+    // GENDER INTELLIGENCE: Skip pregnancies for males
+    if (features.disease === 'diabetes' && features.biologicalSex === '1') {
+      diseaseInputs = diseaseInputs.filter(step => step.key !== 'pregnancies');
+    }
+    
+    return [DISEASE_SELECTOR, ...diseaseInputs, PRESCRIPTION_STEP];
+  }, [features.disease, user, features.biologicalSex]);
+
+  // Handle URL parameters and Patient-Doctor binding
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const pName = params.get('patientName');
+    const pId = params.get('patientId');
+    
+    // 1. Resolve Patient Identity from URL (Doctor flow)
+    if (pName) {
+      setFeatures(prev => ({ ...prev, patientName: pName }));
+      if (pId) setTargetPatientId(pId);
+      
+      // Automatically advance past disease selection and identity fields
+      if (currentStep === 0) {
+          let targetStep = 1; // Start by skipping disease selector
+          
+          if (wizardSteps[targetStep]?.key === 'treatingDoctor' && user?.role === 'doctor') {
+            targetStep++;
+          }
+          
+          if (wizardSteps[targetStep]?.key === 'patientName') {
+            targetStep++;
+          }
+          
+          setCurrentStep(targetStep); 
+      }
+    }
+    
+    // 2. Resolve Doctor Identity for Patients (Patient flow)
+    const resolvePatientDoctor = async () => {
+      if (user && user.role === 'patient') {
+        try {
+          const res = await fetch(`http://${window.location.hostname}:5000/api/patient-assignment?patient_id=${user.id}`);
+          const data = await res.json();
+          if (data.status === 'success' && data.assigned) {
+            setAssignedPhysician(data.doctor_name);
+            setFeatures(prev => ({ 
+              ...prev, 
+              treatingDoctor: data.doctor_name, 
+              patientName: user.name 
+            }));
+          }
+        } catch (e) {
+          console.warn("Failed to resolve assigned doctor", e);
+        }
+      }
+    };
+    
+    resolvePatientDoctor();
+  }, [location.search, user, wizardSteps]);
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -247,7 +354,7 @@ const Diagnosis: React.FC = () => {
       formData.append('text', text);
       formData.append('disease', voiceDisease);
 
-      fetch('http://localhost:5000/api/voice-diagnosis', {
+      fetch(`http://${window.location.hostname}:5000/api/voice-diagnosis`, {
         method: 'POST',
         body: formData
       })
@@ -281,11 +388,6 @@ const Diagnosis: React.FC = () => {
     }
   }, [voiceRecording]);
 
-  // Build the full wizard steps dynamically: disease selector + disease-specific inputs + prescription
-  const wizardSteps = useMemo(() => {
-    const diseaseInputs = DISEASE_STEPS[features.disease] || DISEASE_STEPS.diabetes;
-    return [DISEASE_SELECTOR, ...diseaseInputs, PRESCRIPTION_STEP];
-  }, [features.disease]);
 
   // Auto-focus input on step change
   useEffect(() => {
@@ -298,7 +400,12 @@ const Diagnosis: React.FC = () => {
   // When disease changes (step 0), reset all feature values and go back to step 1
   const handleDiseaseChange = (newDisease: string) => {
     if (newDisease !== features.disease) {
-      setFeatures(getDefaultFeatures(newDisease));
+      const resetFeatures = getDefaultFeatures(newDisease);
+      if (user && user.role === 'patient') {
+        resetFeatures.patientName = user.name;
+        if (assignedPhysician) resetFeatures.treatingDoctor = assignedPhysician;
+      }
+      setFeatures(resetFeatures);
       // Don't change step — user clicks Next to proceed
     } else {
       setFeatures({ ...features, disease: newDisease });
@@ -310,9 +417,17 @@ const Diagnosis: React.FC = () => {
     // Prescription is OPTIONAL — don't block on empty value for textarea fields
     if (stepKey !== 'disease' && stepKey !== 'prescription' && features[stepKey] === "") return;
 
+    let nextStep = currentStep + 1;
+    
+    // Skip treating doctor if the user is a doctor (still in the array for doctors, but skipped)
+    if (nextStep < wizardSteps.length) {
+      const nextKey = wizardSteps[nextStep].key;
+      if (nextKey === 'treatingDoctor' && user?.role === 'doctor') nextStep++;
+    }
+
     setDirection('forward');
-    if (currentStep < wizardSteps.length - 1) {
-      setCurrentStep(c => c + 1);
+    if (nextStep < wizardSteps.length) {
+      setCurrentStep(nextStep);
     } else {
       handleSubmit();
     }
@@ -320,8 +435,10 @@ const Diagnosis: React.FC = () => {
 
   const handleBack = () => {
     if (currentStep > 0) {
+      let prevStep = currentStep - 1;
+      
       setDirection('backward');
-      setCurrentStep(c => c - 1);
+      setCurrentStep(prevStep);
     }
   };
 
@@ -339,15 +456,21 @@ const Diagnosis: React.FC = () => {
     setLoading(true);
     setApiError("");
     try {
-      const payload = {
+      const payload: any = {
         features: buildPayload(features.disease, features),
         prescription: features.prescription,
-        disease: features.disease
+        disease: features.disease,
+        patient_name: features.patientName || user?.name || 'Unknown Patient',
+        patient_id: targetPatientId || (user?.role === 'patient' ? user?.email : 'web_user'),
+        treating_doctor: features.treatingDoctor || assignedPhysician || (user?.role === 'doctor' ? user?.name : 'Primary Physician Sync'),
+        treating_doctor_id: (user?.role === 'doctor' ? user?.id || user?.email : undefined) 
       };
+      // If we're a patient, and we have an assigned doctor, we should ideally pass their ID too if we had it.
+      // For now, focusing on the Doctor's dashboard fix as requested.
 
       const response = await predictAPI(payload);
       if (!response) {
-        setApiError("BACKEND OFFLINE — Neural engine at 127.0.0.1:5000 is unreachable. Start the Flask server first.");
+        setApiError("BACKEND OFFLINE — Unable to reach the backend API. Start the Flask server and ensure port 5000 is accessible.");
       } else if (response.error) {
         setApiError(response.error);
       } else {
@@ -355,11 +478,18 @@ const Diagnosis: React.FC = () => {
         addRecord({
           glucose: Number(features.glucose || 0), bloodPressure: Number(features.bloodPressure || features.restingBP || 0),
           bmi: Number(features.bmi || 0), risk: response.risk, confidence: response.confidence,
-          matchedDrugs: response.matched_drugs || [], disease: response.disease || features.disease
+          matchedDrugs: response.matched_drugs || [],
+          disease: response.disease || features.disease,
+          autoMedications: response.auto_medications || [],
+          recommendations: response.recommendations || {},
+          drugInteractions: response.drug_interactions || [],
+          prescriptionEvaluation: response.prescription_evaluation || undefined,
+          treatingDoctor: response.treating_doctor || features.treatingDoctor,
+          patientName: response.patient_name || features.patientName
         });
       }
     } catch {
-      setApiError("CRITICAL FAILURE — Neural uplink connection lost. Check if the backend server is running.");
+      setApiError("CRITICAL FAILURE — Neural uplink connection lost. Check that the Flask backend is running and reachable.");
     } finally {
       setLoading(false);
     }
@@ -500,7 +630,11 @@ const Diagnosis: React.FC = () => {
                       initial="enter"
                       animate="center"
                       exit="exit"
-                      transition={{ duration: 0.4, ease: [0.33, 1, 0.68, 1] }}
+                      transition={{ 
+                        duration: 0.5, 
+                        ease: [0.22, 1, 0.36, 1],
+                        opacity: { duration: 0.3 }
+                      }}
                       className="w-full max-w-md flex flex-col items-center gap-5"
                     >
                       {/* Step counter */}
@@ -624,7 +758,7 @@ const Diagnosis: React.FC = () => {
                       ) : (
                         <input
                           ref={inputRef as React.RefObject<HTMLInputElement>}
-                          type="number"
+                          type={currentField.type === 'text' ? 'text' : 'number'}
                           value={features[currentField.key]}
                           onChange={(e) => setFeatures({ ...features, [currentField.key]: e.target.value })}
                           onKeyDown={handleKeyDown}
@@ -846,12 +980,16 @@ const Diagnosis: React.FC = () => {
                          <div key={i} className="bg-white/5 rounded-lg p-3 border border-white/5">
                            <div className="flex justify-between items-start">
                              <div>
-                               <p className="text-white font-bold text-sm">{med.name}</p>
-                               <p className="text-cyan-400 text-xs font-mono">{med.dosage} — {med.frequency}</p>
+                               <p className="text-white font-bold text-sm">{typeof med === 'object' ? String(med.name || 'Medication') : String(med)}</p>
+                               <p className="text-cyan-400 text-xs font-mono">
+                                 {typeof med === 'object' ? `${String(med.dosage || 'As prescribed')} — ${String(med.frequency || 'As directed')}` : ''}
+                               </p>
                              </div>
                              <Pill size={16} className="text-purple-400 mt-1" />
                            </div>
-                           <p className="text-gray-400 text-[11px] mt-1">{med.note}</p>
+                           {typeof med === 'object' && (med.note || med.purpose) && (
+                             <p className="text-gray-400 text-[11px] mt-1">{String(med.note || med.purpose)}</p>
+                           )}
                          </div>
                        ))}
                      </div>
@@ -893,7 +1031,10 @@ const Diagnosis: React.FC = () => {
         ) : (
            <div className="glass-panel glowing-wrap p-8 text-center min-h-[450px]">
              <h1 className="text-3xl font-bold mb-8 neon-text-purple">VISUAL CORTEX UPLINK</h1>
-             <ImageUpload />
+             <ImageUpload 
+               patientId={targetPatientId || undefined} 
+               patientName={features.patientName} 
+             />
            </div>
         )}
       </motion.div>

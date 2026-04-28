@@ -32,7 +32,9 @@ KNOWN_SYMPTOMS = {
     "abdominal pain", "joint pain", "muscle pain", "back pain", "insomnia",
     "anxiety", "depression", "numbness", "tingling", "blurred vision",
     "frequent urination", "excessive thirst", "weight loss", "weight gain",
-    "swelling", "rash", "itching", "palpitations", "sweating"
+    "swelling", "rash", "itching", "palpitations", "sweating",
+    "vsd", "septal defect", "down syndrome", "congenital", "surgery",
+    "cardiac surgery", "pediatric surgery", "surgical plan"
 }
 
 # Dosage extraction patterns
@@ -169,14 +171,15 @@ class NLPProcessor:
                     "medical prescription",
                     "patient complaint",
                     "clinical notes",
-                    "non-medical text",
-                    "drug inquiry"
+                    "surgical instruction",
+                    "congenital assessment",
+                    "non-medical text"
                 ]
                 result = self.classifier(text[:512], candidate_labels)
                 classification = result['labels'][0]
                 confidence = round(float(result['scores'][0]), 4)
 
-                is_valid = classification != "non-medical text" or len(drugs_found) > 0
+                is_valid = classification != "non-medical text" or len(drugs_found) > 0 or any(kw in text.lower() for kw in ["bp", "ecg", "echo", "cardiology", "history of", "mg", "syndrome"])
                 return classification, confidence, is_valid
             else:
                 # SST-2 fallback

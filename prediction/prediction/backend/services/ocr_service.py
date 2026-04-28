@@ -31,7 +31,17 @@ class OCRService:
         try:
             results = self.reader.readtext(image_path)
             extracted_text = " ".join([res[1] for res in results])
-            return {"text": extracted_text, "status": "success"}
+            
+            # Calculate average confidence
+            avg_conf = 0.0
+            if results:
+                avg_conf = sum([res[2] for res in results]) / len(results)
+                
+            return {
+                "text": extracted_text, 
+                "status": "success",
+                "clarity_raw": round(avg_conf * 100, 2)
+            }
         except Exception as e:
             logger.error(f"Error during OCR extraction: {e}")
             return {"text": "", "status": "error", "error": str(e)}
