@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { 
   Users, Stethoscope, Activity, AlertTriangle, Shield, Heart, Brain, 
-  Pill, ChevronDown, ChevronUp, Search, ShieldCheck, Mail, Send, Loader2
+  Pill, ChevronDown, ChevronUp, Search, ShieldCheck, Mail, Send, Loader2, Sparkles
 } from 'lucide-react';
 
 const RISK_CONFIG: Record<string, { color: string; bg: string; border: string; glow: string }> = {

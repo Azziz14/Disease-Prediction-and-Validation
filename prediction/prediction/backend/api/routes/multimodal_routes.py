@@ -515,25 +515,34 @@ def read_notifications():
 def get_clinical_history():
     email = request.args.get('email', '').strip().lower()
     role = request.args.get('role', 'patient')
+    patient_id_arg = request.args.get('patient_id', '').strip().lower()
 
     # Force role normalization
     role_str = str(role or '').strip().lower()
     email_clean = str(email or '').strip().lower()
     is_clinical = 'admin' in role_str or 'doctor' in role_str
     
-    # 1. Absolute Authority Override (Admin Master Key)
-    if 'admin' in role_str or email_clean == 'admin@123':
+    # 1. Absolute Authority Override (Admin/Doctor Master Key)
+    if is_clinical or email_clean == 'admin@123':
         filter_query = {}
     else:
         # Patient: Case-insensitive search across all identity keys
+        or_conditions = []
         if email_clean:
-            filter_query = {
-                "$or": [
-                    {"patient_id": {"$regex": f"^{email_clean}$", "$options": "i"}},
-                    {"user_id": {"$regex": f"^{email_clean}$", "$options": "i"}},
-                    {"patient_name": {"$regex": email_clean, "$options": "i"}}
-                ]
-            }
+            or_conditions.extend([
+                {"patient_id": {"$regex": f"^{email_clean}$", "$options": "i"}},
+                {"user_id": {"$regex": f"^{email_clean}$", "$options": "i"}},
+                {"patient_name": {"$regex": email_clean, "$options": "i"}}
+            ])
+        if patient_id_arg:
+            or_conditions.extend([
+                {"patient_id": {"$regex": f"^{patient_id_arg}$", "$options": "i"}},
+                {"user_id": {"$regex": f"^{patient_id_arg}$", "$options": "i"}},
+                {"patient_name": {"$regex": patient_id_arg, "$options": "i"}}
+            ])
+            
+        if or_conditions:
+            filter_query = {"$or": or_conditions}
         else:
             filter_query = {"patient_id": "none_specified"}
 

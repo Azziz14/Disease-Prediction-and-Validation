@@ -63,11 +63,33 @@ def get_dashboard_data():
             if is_clinical:
                 # 1. Fetch All Raw Data first
                 all_patients = list(db_client.db.patients.find({}))
-                patient_registry = {str(p.get('user_id')): p for p in all_patients if p.get('user_id')}
+                patient_registry = {}
+                for p in all_patients:
+                    uid = p.get('user_id') or str(p.get('_id'))
+                    if uid:
+                        patient_registry[str(uid).strip().lower()] = p
+
+                all_records = list(db_client.db.medical_records.find({}))
+                all_preds = list(db_client.db.predictions.find({}))
                 
-                pipeline = [{"$sort": {"timestamp": -1}}, {"$group": {"_id": "$patient_id", "latest": {"$first": "$$ROOT"}}}]
-                latest_records_map = {str(res['_id']): res['latest'] for res in list(db_client.db.medical_records.aggregate(pipeline))}
+                combined_records = all_records + [p for p in all_preds if str(p.get('_id')) not in {str(r.get('_id')) for r in all_records}]
                 
+                def sort_key(rec):
+                    val = rec.get('timestamp') or rec.get('date') or ''
+                    if hasattr(val, 'isoformat'):
+                        return val.isoformat()
+                    return str(val)
+                
+                combined_records.sort(key=sort_key, reverse=True)
+                
+                latest_records_map = {}
+                for r in combined_records:
+                    pid = r.get('patient_id') or r.get('user_id')
+                    if pid:
+                        pid_str = str(pid).strip().lower()
+                        if pid_str not in latest_records_map:
+                            latest_records_map[pid_str] = r
+
                 all_known_ids = set(patient_registry.keys()) | set(latest_records_map.keys())
 
                 # 2. Compile Statistics
@@ -134,7 +156,7 @@ def get_dashboard_data():
                 # Calculate risk distribution from predictions
                 risk_counts = {'High': 0, 'Moderate': 0, 'Low': 0}
                 disease_counts = {}
-                for pred in recent_preds:
+                for pred in recent:
                     risk = pred.get('risk', 'Low')
                     if risk in risk_counts:
                         risk_counts[risk] += 1
