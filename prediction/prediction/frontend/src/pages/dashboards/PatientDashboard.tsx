@@ -105,31 +105,31 @@ const PatientDashboard: React.FC = () => {
     setSubmittingFeedback(false);
   };
 
-  useEffect(() => {
-    const fetchData = () => {
-      // SMART POLLING: Only fetch if the window is currently visible to the user
-      if (document.hidden) return;
-      
-      fetch(`http://${window.location.hostname}:5000/api/dashboard-data?role=patient&user_id=${user?.id}`)
-        .then(res => res.json())
-        .then(res => {
-          if (res.status === 'success') {
-            setData(res.data);
-          }
-        })
-        .catch(err => {
-          console.error('Poll Error:', err);
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    };
+  const fetchData = React.useCallback(() => {
+    // SMART POLLING: Only fetch if the window is currently visible to the user
+    if (document.hidden) return;
+    
+    fetch(`http://${window.location.hostname}:5000/api/dashboard-data?role=patient&user_id=${user?.id}`)
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === 'success') {
+          setData(res.data);
+        }
+      })
+      .catch(err => {
+        console.error('Poll Error:', err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [user]);
 
+  useEffect(() => {
     fetchData();
     // 30-second polling for real-time diagnostic sync (Only when tab is active)
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [fetchData]);
 
   const handleAudio = async (blob: Blob) => {
     setLoadingAudio(true);
@@ -154,7 +154,9 @@ const PatientDashboard: React.FC = () => {
       const resultData = await res.json();
       if (resultData.status === 'success') {
         setActiveInsight(resultData);
-        setActiveTab('dashboard'); // Auto-switch to see results
+        setActiveTab('dashboard'); 
+        // Trigger immediate refresh of history
+        fetchData();
       } else {
         alert(`Error: ${resultData.error || 'Prediction failed.'}`);
       }
@@ -189,7 +191,9 @@ const PatientDashboard: React.FC = () => {
       
       if (resultData.status === 'success') {
         setActiveInsight(resultData);
-        setActiveTab('dashboard'); // Auto-switch to see results
+        setActiveTab('dashboard');
+        // Trigger immediate refresh of history
+        fetchData();
       } else {
         alert(`Scanner Error: ${resultData.error || 'Failed to interpret image.'}`);
       }
@@ -384,7 +388,7 @@ const PatientDashboard: React.FC = () => {
                 <li key={i}>
                   {typeof rec === 'object' ? (
                     <span>
-                      <strong>{String(rec.name || 'Unknown')}</strong> {rec.dosage ? `(${String(rec.dosage)})` : ''} - {String(rec.note || rec.purpose || rec.frequency || '')}
+                      <strong>{String(rec.name || rec.purpose || 'Directive')}</strong> {rec.dosage ? `(${String(rec.dosage)})` : ''} - {String(rec.note || rec.purpose || rec.frequency || rec.target_condition || '')}
                     </span>
                   ) : String(rec)}
                 </li>
@@ -398,9 +402,11 @@ const PatientDashboard: React.FC = () => {
               <p style={{ fontSize: '10px', fontWeight: 'bold', color: '#c53030', textTransform: 'uppercase', marginBottom: '10px' }}>Attention: Medication Suggestions</p>
               {activeInsight?.auto_medications?.map((med: any, i: number) => (
                 <div key={i} style={{ marginBottom: '10px' }}>
-                  <p style={{ fontSize: '13px', fontWeight: 'bold', margin: 0 }}>{typeof med === 'object' ? String(med.name || 'Unknown') : String(med)}</p>
+                  <p style={{ fontSize: '13px', fontWeight: 'bold', margin: 0 }}>
+                    {typeof med === 'object' ? String(med.name || med.purpose || 'Medication') : String(med)}
+                  </p>
                   <p style={{ fontSize: '11px', margin: 0 }}>
-                    {typeof med === 'object' ? `${String(med.dosage || 'As prescribed')} - ${String(med.frequency || 'As directed')}` : ''}
+                    {typeof med === 'object' ? `${String(med.dosage || 'As prescribed')} - ${String(med.frequency || med.purpose || 'As directed')}` : ''}
                   </p>
                 </div>
               ))}
@@ -698,8 +704,12 @@ const PatientDashboard: React.FC = () => {
                              <p className="text-[10px] text-purple-300/50 uppercase">Directed Medications</p>
                               {logMeds.map((m: any, mi: number) => (
                                 <div key={mi} className="flex justify-between text-xs p-2 bg-white/5 rounded-lg">
-                                   <span className="text-white font-medium">{typeof m === 'object' ? String(m.name || 'Medication') : String(m)}</span>
-                                   <span className="text-white/40">{typeof m === 'object' ? String(m.dosage || m.note || 'As directed') : ''}</span>
+                                   <span className="text-white font-medium">
+                                     {typeof m === 'object' ? String(m.name || m.purpose || 'Medication') : String(m)}
+                                   </span>
+                                   <span className="text-white/40">
+                                     {typeof m === 'object' ? String(m.dosage || m.note || m.purpose || 'As directed') : ''}
+                                   </span>
                                 </div>
                               ))}
                           </div>

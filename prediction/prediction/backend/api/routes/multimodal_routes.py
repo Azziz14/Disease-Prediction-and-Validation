@@ -253,7 +253,14 @@ def upload_prescription():
         patient_name = request.form.get('patient_name', 'Unknown Patient')
         treating_doctor = request.form.get('treating_doctor', 'Unspecified Physician')
         treating_doctor_id = request.form.get('treating_doctor_id', '').strip().lower()
-        if not treating_doctor_id and treating_doctor == 'Unspecified Physician':
+
+        if not treating_doctor_id and treating_doctor != 'Unspecified Physician':
+             # Fallback to name-based lookup if ID is missing but name exists
+             doc_user = db_client.db.users.find_one({"name": treating_doctor, "role": "doctor"})
+             if doc_user:
+                 treating_doctor_id = doc_user.get("email") or str(doc_user["_id"])
+        
+        if not treating_doctor_id:
              treating_doctor_id = 'unspecified_physician'
              
         numeric_id = _get_numeric_id(patient_id)
@@ -312,6 +319,20 @@ def upload_prescription():
             
             insert_res = db_client.db.medical_records.insert_one(record_doc)
             db_client.db.predictions.insert_one(record_doc)
+            
+            # CRITICAL: Update/Create patient record so they appear in Admin Dashboard
+            db_client.db.patients.update_one(
+                {"user_id": patient_id.strip().lower()},
+                {"$set": {
+                    "name": patient_name,
+                    "last_visit": record_doc["date"],
+                    "risk": record_doc["risk"],
+                    "disease": record_doc["disease"],
+                    "treating_doctor": treating_doctor
+                }},
+                upsert=True
+            )
+            
             if insert_res:
                 record_id = str(insert_res.inserted_id)
             if "_id" in record_doc:
@@ -402,6 +423,16 @@ def voice_diagnosis():
         patient_id = request.form.get("patient_id", "voice_user")
         patient_name = request.form.get("patient_name", "Unknown Patient")
         treating_doctor = request.form.get("treating_doctor", "Unspecified Physician")
+        treating_doctor_id = request.form.get("treating_doctor_id", "").strip().lower()
+        
+        if not treating_doctor_id and treating_doctor != "Unspecified Physician":
+            doc_user = db_client.db.users.find_one({"name": treating_doctor, "role": "doctor"})
+            if doc_user:
+                treating_doctor_id = doc_user.get("email") or str(doc_user["_id"])
+        
+        if not treating_doctor_id:
+            treating_doctor_id = "unspecified_physician"
+
         numeric_id = _get_numeric_id(patient_id)
         
         recs = ai_data.get("master_directives") or result.get("recommendations") or RecommendationService().get_recommendations(disease)
@@ -426,6 +457,20 @@ def voice_diagnosis():
         if db_client.db is not None:
             db_client.db.predictions.insert_one(record_doc)
             db_client.db.medical_records.insert_one(record_doc)
+            
+            # CRITICAL: Update/Create patient record so they appear in Admin Dashboard
+            db_client.db.patients.update_one(
+                {"user_id": patient_id},
+                {"$set": {
+                    "name": patient_name,
+                    "last_visit": record_doc["timestamp"],
+                    "risk": record_doc["risk"],
+                    "disease": record_doc["disease"],
+                    "treating_doctor": treating_doctor
+                }},
+                upsert=True
+            )
+            
             if "_id" in record_doc:
                 record_doc["_id"] = str(record_doc["_id"])
 
@@ -470,35 +515,72 @@ def read_notifications():
 def get_clinical_history():
     email = request.args.get('email', '').strip().lower()
     role = request.args.get('role', 'patient')
+
+    # Force role normalization
+    role_str = str(role or '').strip().lower()
+    email_clean = str(email or '').strip().lower()
+    is_clinical = 'admin' in role_str or 'doctor' in role_str
     
-    if db_client.db is None:
-        return jsonify({"error": "Database offline"}), 500
-        
-    try:
-        # Resilient Query Policy: Show records if user is either patient or doctor
-        if role == 'admin':
-            filter_query = {}
-        else:
-            # Match either ID, or generic web_user if this is the only record
+    # 1. Absolute Authority Override (Admin Master Key)
+    if 'admin' in role_str or email_clean == 'admin@123':
+        filter_query = {}
+    else:
+        # Patient: Case-insensitive search across all identity keys
+        if email_clean:
             filter_query = {
                 "$or": [
-                    {"patient_id": email},
-                    {"treating_doctor": email},
-                    {"patient_id": "web_user"} if not email else {"_no_match": True} 
+                    {"patient_id": {"$regex": f"^{email_clean}$", "$options": "i"}},
+                    {"user_id": {"$regex": f"^{email_clean}$", "$options": "i"}},
+                    {"patient_name": {"$regex": email_clean, "$options": "i"}}
                 ]
             }
+        else:
+            filter_query = {"patient_id": "none_specified"}
+
+    try:
+        if db_client.db is None:
+            return jsonify({"status": "error", "message": "DB disconnected"}), 500
             
-        records = list(db_client.db.medical_records.find(filter_query).sort("timestamp", -1).limit(100))
+        # 2. Direct Database Pull
+        records = list(db_client.db.medical_records.find(filter_query).limit(500))
         
+        # 3. Supplemental Predictions Pull (Merge prediction collection for audit integrity)
+        if is_clinical:
+            pred_records = list(db_client.db.predictions.find(filter_query).limit(500))
+            seen_ids = {str(r.get('_id')) for r in records}
+            for pr in pred_records:
+                if str(pr.get('_id')) not in seen_ids:
+                    records.append(pr)
+
+        # 4. JSON Serialization Cleanup
+        final_history = []
         for r in records:
-            r['id'] = str(r.pop('_id'))
-            if isinstance(r.get('timestamp'), datetime.datetime):
-                r['timestamp'] = r['timestamp'].isoformat()
+            try:
+                # Standardize Fields for Admin View
+                r['id'] = str(r.pop('_id', 'unknown'))
+                ts = r.get('timestamp') or r.get('date') or datetime.datetime.utcnow()
+                r['timestamp'] = ts.isoformat() if hasattr(ts, 'isoformat') else str(ts)
+                r['patient_id'] = str(r.get('patient_id') or r.get('user_id') or 'Guest')
+                r['disease'] = str(r.get('disease') or r.get('diagnosis') or 'N/A')
+                r['risk'] = str(r.get('risk') or 'Low')
                 
-        return jsonify({"status": "success", "history": records})
+                final_history.append(r)
+            except:
+                continue
+
+        # 5. Global Clinical Sort
+        final_history.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+
+        return jsonify({
+            "status": "success",
+            "history": final_history,
+            "count": len(final_history)
+        })
+
     except Exception as e:
+        print(f"HISTORY_ERROR: {str(e)}")
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Failed to fetch clinical records", "details": str(e)}), 500
 
 @multimodal_bp.route('/patient-history/search', methods=['POST'])
 def search_history():

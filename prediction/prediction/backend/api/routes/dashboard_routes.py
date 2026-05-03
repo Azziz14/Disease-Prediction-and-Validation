@@ -52,99 +52,83 @@ def _get_fallback_data(role, user_id=None):
 def get_dashboard_data():
     role = request.args.get('role', 'patient')
     user_id = request.args.get('user_id')
-    
-    cache_key = f"{role}_{user_id}"
-    cached = _get_cached_data(cache_key)
-    if cached:
-        return jsonify({"status": "success", "data": cached, "cached": True})
+    role_str = str(role or '').strip().lower()
+    is_clinical = 'admin' in role_str or 'doctor' in role_str
 
     try:
         # Try MongoDB first
         if db_client.db is not None:
             data = {}
             
-            if role == 'admin':
-                data['total_patients'] = db_client.db.patients.count_documents({})
-                data['total_doctors'] = db_client.db.doctors.count_documents({})
-                data['total_predictions'] = db_client.db.predictions.count_documents({})
-                
-                # Standardized Recent Predictions for Admin Log
-                recent_preds = list(db_client.db.predictions.find().sort("timestamp", -1).limit(20))
-                for p in recent_preds: 
-                    p['_id'] = str(p['_id'])
-                    if 'timestamp' in p and p['timestamp']:
-                        p['timestamp'] = p['timestamp'].isoformat() if hasattr(p['timestamp'], 'isoformat') else str(p['timestamp'])
-                data['recent_predictions'] = recent_preds
-                
-                # Fetch all patients for formatted display
+            if is_clinical:
+                # 1. Fetch All Raw Data first
                 all_patients = list(db_client.db.patients.find({}))
+                patient_registry = {str(p.get('user_id')): p for p in all_patients if p.get('user_id')}
                 
-                # Doctor Registry for Admin Hub
+                pipeline = [{"$sort": {"timestamp": -1}}, {"$group": {"_id": "$patient_id", "latest": {"$first": "$$ROOT"}}}]
+                latest_records_map = {str(res['_id']): res['latest'] for res in list(db_client.db.medical_records.aggregate(pipeline))}
+                
+                all_known_ids = set(patient_registry.keys()) | set(latest_records_map.keys())
+
+                # 2. Compile Statistics
+                total_doctors = db_client.db.users.count_documents({"role": "doctor"})
+                pred_count = db_client.db.predictions.count_documents({})
+                rec_count = db_client.db.medical_records.count_documents({})
+                
+                data['total_patients'] = len(all_known_ids)
+                data['total_doctors'] = total_doctors
+                data['total_predictions'] = max(pred_count, rec_count)
+                
+                # 3. Format Patient Table
+                formatted_patients = []
+                for p_id in all_known_ids:
+                    p_info = patient_registry.get(p_id, {})
+                    latest_r = latest_records_map.get(p_id, {})
+                    raw_ts = latest_r.get("timestamp") or latest_r.get("date") or "N/A"
+                    last_v = str(raw_ts).split('T')[0] if 'T' in str(raw_ts) else str(raw_ts)
+
+                    formatted_patients.append({
+                        "id": p_id,
+                        "name": p_info.get("name") or latest_r.get("patient_name") or "Unknown Patient",
+                        "age": p_info.get("age", 45),
+                        "gender": p_info.get("gender", "M"),
+                        "disease": latest_r.get("disease", "General"),
+                        "doctor": latest_r.get("treating_doctor", "System"),
+                        "risk": latest_r.get("risk", "Low"),
+                        "confidence": latest_r.get("confidence", 0.85),
+                        "glucose": latest_r.get("glucose", 100),
+                        "bloodPressure": latest_r.get("blood_pressure", 120),
+                        "bmi": latest_r.get("bmi", 22),
+                        "last_visit": last_v,
+                        "prescribed_medicines": latest_r.get("auto_medications") or latest_r.get("matched_drugs") or ["No prescription"],
+                        "symptoms": ["General inquiry"],
+                        "notes": "Electronic health record updated."
+                    })
+                data['patients'] = formatted_patients
+                
+                # 4. Standardized Recent Predictions
+                recent = list(db_client.db.predictions.find().sort("timestamp", -1).limit(30))
+                if not recent: recent = list(db_client.db.medical_records.find().sort("timestamp", -1).limit(30))
+                for r in recent: 
+                    r['_id'] = str(r['_id'])
+                    r['timestamp'] = str(r.get('timestamp') or r.get('date') or '')
+                data['recent_predictions'] = recent
+                
+                # 5. Doctor Registry
                 doctors = list(db_client.db.users.find({"role": "doctor"}))
                 doctor_registry = []
                 for d in doctors:
-                    d_id = d.get("user_id")
-                    # Fetch patients for this doctor
-                    doctor_patients = list(db_client.db.patients.find({"treating_doctor": d_id}))
-                    assigned_patients = []
-                    for pat in doctor_patients:
-                        p_id = pat.get("user_id")
-                        # Basic patient info lookup
-                        assigned_patients.append({
-                            "id": p_id,
-                            "name": pat.get("name", "Unknown Patient"),
-                            "has_flags": False # Simplified for stability
-                        })
-                    
+                    d_id = d.get("user_id") or str(d.get("_id"))
                     doctor_registry.append({
                         "id": d_id,
                         "name": d.get("name"),
                         "email": d.get("email"),
                         "rank": d.get("clinical_rank", 90),
                         "errors": d.get("wrong_prescription_count", 0),
-                        "patients": assigned_patients
+                        "performance_signal": d.get("performance_signal", "green"),
+                        "admin_signal_note": d.get("admin_signal_note", ""),
+                        "patients": []
                     })
-                
-                # 1. Bulk fetch latest records for all patients to avoid O(N) queries
-                all_patient_ids = [p.get('user_id') or p.get('id') for p in all_patients]
-                # Aggregate to get the latest record for each patient
-                pipeline = [
-                    {"$match": {"patient_id": {"$in": all_patient_ids}}},
-                    {"$sort": {"timestamp": -1}},
-                    {"$group": {
-                        "_id": "$patient_id",
-                        "latest": {"$first": "$$ROOT"}
-                    }}
-                ]
-                latest_records_map = {str(res['_id']): res['latest'] for res in list(db_client.db.medical_records.aggregate(pipeline))}
-
-                formatted_patients = []
-                for p in all_patients:
-                    p_id = p.get('user_id') or p.get('id')
-                    latest_record = latest_records_map.get(str(p_id), {})
-                    
-                    # Resilient Date String Handling
-                    raw_ts = latest_record.get("timestamp", "N/A")
-                    last_visit = raw_ts.split('T')[0] if isinstance(raw_ts, str) and 'T' in raw_ts else str(raw_ts)
-
-                    formatted_patients.append({
-                        "id": p_id,
-                        "name": p.get("name", "Unknown Patient"),
-                        "age": p.get("age", 45),
-                        "gender": p.get("gender", "M"),
-                        "disease": latest_record.get("disease", "General"),
-                        "doctor": latest_record.get("treating_doctor", "System"),
-                        "risk": latest_record.get("risk", "Low"),
-                        "confidence": latest_record.get("confidence", 0.85),
-                        "glucose": latest_record.get("glucose", 100),
-                        "bloodPressure": latest_record.get("blood_pressure", 120),
-                        "bmi": latest_record.get("bmi", 22),
-                        "last_visit": last_visit,
-                        "prescribed_medicines": latest_record.get("matched_drugs") or ["No prescription"],
-                        "symptoms": ["General inquiry"],
-                        "notes": "Electronic health record updated."
-                    })
-                data['patients'] = formatted_patients
                 data['doctor_registry'] = doctor_registry
                 
                 # Calculate risk distribution from predictions
@@ -184,6 +168,11 @@ def get_dashboard_data():
                 flags = list(db_client.db.doctor_flags.find({"doctor_id": user_id, "status": "active"}))
                 data['is_flagged'] = len(flags) > 0
                 data['active_flags'] = [{ "reason": f.get("reason"), "date": f.get("flagged_date").isoformat() if hasattr(f.get("flagged_date"), "isoformat") else str(f.get("flagged_date")) } for f in flags]
+
+                # Fetch performance signal
+                user_doc = db_client.db.users.find_one({"$or": [{"user_id": user_id}, {"email": user_id}]})
+                data['performance_signal'] = user_doc.get('performance_signal', 'green') if user_doc else 'green'
+                data['admin_signal_note'] = user_doc.get('admin_signal_note', '') if user_doc else ''
                 
             else: # patient
                 if not user_id:
@@ -193,14 +182,20 @@ def get_dashboard_data():
                 user_doc = db_client.db.users.find_one({"$or": [{"user_id": user_id}, {"_id": user_id}, {"email": user_id}]})
                 user_name = user_doc.get("name") if user_doc else None
                 
-                # UINIFIED SEARCH: Search by ID or Name to bridge legacy session gaps
-                id_search = {"$or": [
-                    {"patient_id": user_id}, 
-                    {"user_id": user_id},
-                    {"patient_name": user_name} if user_name else {}
-                ]}
-                # Filter out empty dicts if user_name is None
+                # UINIFIED SEARCH: Search by ID, Email, or Name to bridge legacy session gaps
+                id_search = {
+                    "$or": [
+                        {"patient_id": user_id}, 
+                        {"user_id": user_id},
+                        {"patient_id": user_doc['email']} if user_doc else None,
+                        {"patient_name": {"$regex": user_name, "$options": "i"}} if user_name else None
+                    ]
+                }
+                # Filter out None values
                 id_search["$or"] = [x for x in id_search["$or"] if x]
+                
+                # OPTIMIZATION: Disable cache for patients to ensure real-time results
+                cache_key = None 
                 
                 # Fetch records with resilient ID + Name search
                 patient_records = list(db_client.db.medical_records.find(id_search).sort("timestamp", -1))

@@ -216,8 +216,45 @@ def get_all_feedback():
             
             return jsonify({"status": "success", "data": feedback_list})
         
+            return jsonify({"status": "success", "data": feedback_list})
+        
         return jsonify({"status": "success", "data": []})
             
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@doctor_review_bp.route('/set-doctor-signal', methods=['POST'])
+def set_doctor_signal():
+    """Admin only: Set a performance signal (Green/Yellow/Red) for a doctor."""
+    data = request.get_json()
+    doctor_id = data.get('doctor_id')
+    signal = data.get('signal') # 'green', 'yellow', 'red'
+    admin_note = data.get('admin_note', '')
+    
+    if not doctor_id or not signal:
+        return jsonify({"error": "doctor_id and signal are required"}), 400
+        
+    try:
+        from bson import ObjectId
+        if db_client.db is not None:
+            # Try to match by _id or user_id
+            query = {"$or": [{"user_id": doctor_id}]}
+            try:
+                query["$or"].append({"_id": ObjectId(doctor_id)})
+            except:
+                pass
+
+            db_client.db.users.update_one(
+                query,
+                {"$set": {
+                    "performance_signal": signal,
+                    "admin_signal_note": admin_note,
+                    "signal_updated_at": datetime.utcnow()
+                }}
+            )
+            return jsonify({"status": "success", "message": f"Signal set to {signal} for Dr. {doctor_id}"})
+        return jsonify({"error": "Database offline"}), 500
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500

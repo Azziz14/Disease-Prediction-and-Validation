@@ -96,7 +96,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       loginWithPassword,
       logout,
       isAuthenticated: !!user,
-      isAdmin: user?.role === 'admin'
+      isAdmin: user?.role?.toLowerCase() === 'admin'
     }}>
       {children}
     </AuthContext.Provider>

@@ -174,11 +174,15 @@ class PredictionService:
             from utils.db import db_client
             
             # Simple direct logging to ensure stability
+            # Identity resolution for clinical audit
+            final_patient_id = patient_id if patient_id and patient_id != "web_user" else (user_id if user_id and "@" in str(user_id) else "anonymous")
+            final_doctor_id = treating_doctor_id or (user_id if user_id and "@" not in str(user_id) else "system")
+
             log_entry = {
-                "patient_id": patient_id or user_id or "anonymous",
+                "patient_id": final_patient_id,
                 "patient_name": patient_name or "Anonymous Patient",
-                "treating_doctor_id": treating_doctor_id or user_id or "system",
-                "doctor_id": treating_doctor_id or user_id or "system",
+                "treating_doctor_id": final_doctor_id,
+                "doctor_id": final_doctor_id,
                 "disease": disease_type,
                 "risk": risk,
                 "confidence": float(probability),

@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { downloadReportPDF } from '../services/api';
 
 const History: React.FC = () => {
-  const { history } = usePatientData();
+  const { history, loadData } = usePatientData();
   const { isAdmin } = useAuth();
   const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,16 +17,25 @@ const History: React.FC = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const query = params.get('search') || params.get('patient');
-    if (query) {
-      setSearchTerm(query);
+    const pid = params.get('patientId');
+    if (pid) {
+      setSearchTerm(pid);
+      loadData(pid);
+    } else if (isAdmin) {
+      // Force load all for Admin if no specific ID
+      loadData();
     }
-  }, [location.search]);
+  }, [location, isAdmin]);
 
   const filteredHistory = history.filter(record => {
-    const matchSearch = record.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.doctorId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchRisk = highRiskOnly ? record.risk === 'High' : true;
+    const q = searchTerm.toLowerCase();
+    const matchSearch = 
+      (record.patientId?.toLowerCase() || "").includes(q) ||
+      (record.patientName?.toLowerCase() || "").includes(q) ||
+      (record.disease?.toLowerCase() || "").includes(q) ||
+      (record.doctorId?.toLowerCase() || "").includes(q);
+      
+    const matchRisk = highRiskOnly ? (record.risk || "").toLowerCase().includes('high') : true;
     return matchSearch && matchRisk;
   });
 
@@ -112,7 +121,7 @@ const History: React.FC = () => {
                 filteredHistory.map((record) => (
                   <React.Fragment key={record.id}>
                     <tr className="border-b border-border-muted hover:bg-surface-alt transition-colors group">
-                      <td className="px-5 py-4 font-medium text-text-primary group-hover:text-brand transition-colors">{record.id}</td>
+                      <td className="px-5 py-4 font-medium text-text-primary group-hover:text-brand transition-colors">{record.patientId}</td>
                       {isAdmin && <td className="px-5 py-4 font-mono text-xs text-text-muted">{record.doctorId}</td>}
                       <td className="px-5 py-4 text-text-secondary">{(() => {
                         const d = new Date(record.timestamp);
@@ -151,15 +160,21 @@ const History: React.FC = () => {
                                 <div className="space-y-2">
                                   {(record.autoMedications || []).map((med, idx) => (
                                     <div key={`med-${idx}`} className="rounded-lg border border-border-subtle p-2">
-                                      <p className="text-sm font-semibold text-text-primary">{med.name || 'Medication'}</p>
-                                      <p className="text-xs text-text-muted">{med.dosage || 'Dose N/A'} {med.frequency ? `- ${med.frequency}` : ''}</p>
+                                      <p className="text-sm font-semibold text-text-primary">
+                                        {typeof med === 'object' ? String(med.name || med.purpose || 'Medication') : String(med)}
+                                      </p>
+                                      <p className="text-xs text-text-muted">
+                                        {typeof med === 'object' ? `${String(med.dosage || 'Dose N/A')} ${med.frequency ? `- ${String(med.frequency)}` : ''}` : ''}
+                                      </p>
                                     </div>
                                   ))}
                                 </div>
                               ) : (record.matchedDrugs || []).length > 0 ? (
                                 <div className="space-y-1">
                                   {(record.matchedDrugs || []).map((drug, idx) => (
-                                    <p key={`match-${idx}`} className="text-xs text-text-primary">- {drug}</p>
+                                    <p key={`match-${idx}`} className="text-xs text-text-primary">
+                                      - {typeof drug === 'object' ? String(drug.name || drug.purpose || 'Drug') : String(drug)}
+                                    </p>
                                   ))}
                                 </div>
                               ) : (
@@ -196,7 +211,9 @@ const History: React.FC = () => {
                                     ...(record.recommendations?.medical || []),
                                     ...(record.recommendations?.precautions || [])
                                   ].slice(0, 8).map((item, idx) => (
-                                    <p key={`care-${idx}`} className="text-xs text-emerald-800">- {item}</p>
+                                    <p key={`care-${idx}`} className="text-xs text-emerald-800">
+                                      - {typeof item === 'object' ? String(item.name || item.purpose || 'Recommendation') : String(item)}
+                                    </p>
                                   ))}
                                 </div>
                               ) : (

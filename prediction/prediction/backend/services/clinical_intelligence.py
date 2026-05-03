@@ -6,46 +6,60 @@ from utils.clinical_registry import ClinicalRegistry
 
 class ClinicalIntelligenceService:
     def __init__(self):
-        self.api_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENROUTER_API_KEY")
-        self.api_url = "https://api.groq.com/openai/v1/chat/completions" if os.getenv("GROQ_API_KEY") else "https://openrouter.ai/api/v1/chat/completions"
+        # Store all keys for the retry loop
+        self.keys = {
+            "groq": os.getenv("GROQ_API_KEY", "").strip(),
+            "openrouter": os.getenv("OPENROUTER_API_KEY", "").strip(),
+            "openai": os.getenv("OPENAI_API_KEY", "").strip()
+        }
 
     def _call_llm(self, prompt):
-        """Internal helper to call Grok/OpenRouter for generative insights."""
-        if not self.api_key:
-            return None
+        """Internal helper with multi-provider retry logic. Groq is first priority."""
+        providers = [
+            {"name": "groq", "key": self.keys["groq"], "url": "https://api.groq.com/openai/v1/chat/completions", "model": "llama-3.3-70b-versatile"},
+            {"name": "openrouter", "key": self.keys["openrouter"], "url": "https://openrouter.ai/api/v1/chat/completions", "model": "meta-llama/llama-3.3-70b-instruct"},
+            {"name": "openai", "key": self.keys["openai"], "url": "https://api.openai.com/v1/chat/completions", "model": "gpt-4o-mini"}
+        ]
+
+        messages = [
+            {"role": "system", "content": "You are a senior clinical consultant. Provide high-fidelity, non-repetitive, actionable medical advice. USE THE SPECIFIC BIOMARKERS PROVIDED TO CUSTOMIZE THE ADVICE. Avoid generic boilerplates. Return strictly JSON with: 'summary' (str), 'lifestyle' (list), 'medical' (list), 'precautions' (list), and 'medications' (list of objects with 'name', 'dosage', 'frequency', 'note')."},
+            {"role": "user", "content": prompt}
+        ]
+
+        for p in providers:
+            if not p["key"]:
+                continue
+                
+            headers = {
+                "Authorization": f"Bearer {p['key']}",
+                "Content-Type": "application/json"
+            }
             
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        # Determine model based on provider
-        if "groq" in self.api_url:
-            model = "llama-3.3-70b-versatile" 
-        else:
-            # Multi-layered fallback for OpenRouter
-            model = "meta-llama/llama-3.3-70b-instruct"
-        
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": "You are a senior clinical consultant. Provide high-fidelity, non-repetitive, actionable medical advice. USE THE SPECIFIC BIOMARKERS PROVIDED TO CUSTOMIZE THE ADVICE. Avoid generic boilerplates. Return strictly JSON with: 'summary' (str), 'lifestyle' (list), 'medical' (list), 'precautions' (list), and 'medications' (list of objects with 'name', 'dosage', 'frequency', 'note')."},
-                {"role": "user", "content": prompt}
-            ],
-            "response_format": {"type": "json_object"}
-        }
-        
-        try:
-            response = requests.post(self.api_url, headers=headers, json=payload, timeout=20)
-            if response.status_code == 200:
-                content = response.json()['choices'][0]['message']['content']
-                # Clean up content if model adds markdown blocks
-                content = content.replace("```json", "").replace("```", "").strip()
-                return json.loads(content)
-            else:
-                print(f"[ClinicalAI] API Error: {response.status_code} - {response.text}")
-        except Exception as e:
-            print(f"[ClinicalAI] LLM Call failed: {e}")
+            if p["name"] == "openrouter":
+                headers["HTTP-Referer"] = "http://localhost:3000"
+                headers["X-Title"] = "Healthcare AI Platform"
+
+            payload = {
+                "model": p["model"],
+                "messages": messages,
+                "response_format": {"type": "json_object"} if p["name"] != "groq" or "llama-3.3" in p["model"] else None,
+                "temperature": 0.3
+            }
+            
+            try:
+                print(f"[ClinicalAI] Attempting insights via {p['name']}...")
+                response = requests.post(p["url"], headers=headers, json=payload, timeout=20)
+                if response.status_code == 200:
+                    content = response.json()['choices'][0]['message']['content']
+                    # Clean up content if model adds markdown blocks
+                    content = content.replace("```json", "").replace("```", "").strip()
+                    print(f"[ClinicalAI] SUCCESS via {p['name']}")
+                    return json.loads(content)
+                else:
+                    print(f"[ClinicalAI] {p['name']} API Error: {response.status_code} - {response.text}")
+            except Exception as e:
+                print(f"[ClinicalAI] {p['name']} Call failed: {e}")
+                
         return None
 
     def evaluate_biomarkers(self, disease_type, features):

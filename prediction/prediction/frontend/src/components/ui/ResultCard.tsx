@@ -113,10 +113,10 @@ const ResultCard: React.FC<{ result: any }> = ({ result }) => {
                  <BatteryCharging size={14} /> DAILY PROTOCOL
                </h4>
                <ul className="space-y-2">
-                 {ls.map((rec: string, i: number) => (
+                 {ls.map((rec: any, i: number) => (
                    <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
                      <span className="text-[var(--neon-blue)] mt-0.5">•</span>
-                     {rec}
+                     {typeof rec === 'object' ? String(rec.name || rec.purpose || 'Directive') : String(rec)}
                    </li>
                  ))}
                </ul>
@@ -130,10 +130,10 @@ const ResultCard: React.FC<{ result: any }> = ({ result }) => {
                  <HeartPulse size={14} /> MEDICAL PROTOCOL
                </h4>
                <ul className="space-y-2">
-                 {med.map((rec: string, i: number) => (
+                 {med.map((rec: any, i: number) => (
                    <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
                      <span className="text-[var(--neon-purple)] mt-0.5">⚕</span>
-                     {rec}
+                     {typeof rec === 'object' ? String(rec.name || rec.purpose || 'Medication') : String(rec)}
                    </li>
                  ))}
                </ul>

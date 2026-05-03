@@ -317,9 +317,9 @@ const buildAssistantReply = (
       ? medications
           .slice(0, 3)
           .map((item) => {
-            const name = item.name || 'an unnamed medication';
-            const dosage = item.dosage ? ` at ${item.dosage}` : '';
-            const frequency = item.frequency ? `, ${item.frequency}` : '';
+            const name = typeof item === 'object' ? (item.name || item.purpose || 'Medication') : String(item);
+            const dosage = (typeof item === 'object' && item.dosage) ? ` at ${String(item.dosage)}` : '';
+            const frequency = (typeof item === 'object' && item.frequency) ? `, ${String(item.frequency)}` : '';
             return `${name}${dosage}${frequency}`;
           })
           .join('; ')
@@ -511,6 +511,13 @@ const PatientVoiceAssistant: React.FC<PatientVoiceAssistantProps> = ({
     window.speechSynthesis.speak(utterance);
   };
 
+  const stopSpeaking = () => {
+    if (speechSynthesisAvailable) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  };
+
   useEffect(() => {
     if (hasGreetedRef.current) {
       return;
@@ -549,6 +556,7 @@ const PatientVoiceAssistant: React.FC<PatientVoiceAssistantProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question: trimmedQuestion,
+          language: detectedLanguage,
           patientName,
           predictions,
           selectedLog,
@@ -640,6 +648,11 @@ const PatientVoiceAssistant: React.FC<PatientVoiceAssistantProps> = ({
     setIsListening(false);
   };
 
+  const handleVoiceAssistantStop = () => {
+    stopListening();
+    stopSpeaking();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     void respondToQuestion(input);
@@ -658,9 +671,16 @@ const PatientVoiceAssistant: React.FC<PatientVoiceAssistantProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-white/45">
-          {isSpeaking ? <Volume2 size={14} className="text-cyan-400" /> : <Bot size={14} className="text-white/35" />}
-          {isSpeaking ? 'Speaking' : 'Ready'}
+        <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-white/45">
+          {isSpeaking && (
+            <button
+              onClick={stopSpeaking}
+              className="flex items-center gap-1.5 px-2 py-1 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg hover:bg-red-500/20 transition-all animate-pulse"
+            >
+              <Volume2 size={12} /> Stop
+            </button>
+          )}
+          {isSpeaking ? <span className="text-cyan-400">Speaking</span> : <span>Ready</span>}
         </div>
       </div>
 
@@ -746,7 +766,7 @@ const PatientVoiceAssistant: React.FC<PatientVoiceAssistantProps> = ({
           ) : (
             <button
               type="button"
-              onClick={stopListening}
+              onClick={handleVoiceAssistantStop}
               className="px-4 py-3 rounded-xl bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition-colors flex items-center gap-2"
             >
               <Square size={16} />

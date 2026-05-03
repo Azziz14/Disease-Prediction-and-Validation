@@ -9,10 +9,12 @@ import CyberNeuralPath from '../components/ui/CyberNeuralPath';
 import CyberAIWaveform from '../components/ui/CyberAIWaveform';
 import ResultCard from '../components/ui/ResultCard';
 import ImageUpload from '../components/ui/ImageUpload';
-import {
-  Activity, ArrowRight, ArrowLeft, BrainCircuit, Droplet, HeartPulse, Ruler,
+import { 
+  Activity, ArrowLeft, ArrowRight, BrainCircuit, Check, CheckCircle, ChevronRight, 
+  Database, Dumbbell, Fingerprint, Heart, HeartPulse, History, Info, Layers, Loader2, Mic, Pill, 
+  Ruler, Shield, ShieldAlert, Sparkles, Square, Trash2, TrendingUp, Volume2, VolumeX, Zap,
   Calendar, Syringe, Baby, Hash, FileText, Brain, Stethoscope, Flame,
-  Gauge, Zap, Moon, Users, ShieldAlert, Pill, Dumbbell, Mic, Square, Loader2
+  Gauge, Moon, Users
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════
@@ -47,6 +49,7 @@ const DISEASE_STEPS: Record<string, WizardStep[]> = {
   diabetes: [
     { key: 'treatingDoctor', label: 'Treating Physician Name', type: 'text', icon: <Stethoscope className="text-[var(--neon-green)]" />, placeholder: 'Enter your doctor\'s name' },
     { key: 'patientName', label: 'Patient Name', type: 'text', icon: <Users className="text-[var(--neon-blue)]" />, placeholder: 'Enter patient name' },
+    { key: 'patientId', label: 'Patient Neural ID / Email', type: 'text', icon: <Fingerprint className="text-[var(--neon-purple)]" />, placeholder: 'e.g. patient@example.com or pat_123', hint: 'Leave empty for anonymous scan' },
     { key: 'biologicalSex', label: 'Biological Sex', type: 'select-numeric', icon: <Users className="text-[var(--neon-blue)]" />, options: [{ value: '1', label: 'Male' }, { value: '0', label: 'Female' }] },
     { key: 'pregnancies', label: 'Pregnancies', type: 'number', icon: <Baby className="text-[var(--neon-purple)]" />, placeholder: 'e.g. 2' },
     { key: 'glucose', label: 'Glucose Level (mg/dL)', type: 'number', icon: <Activity className="text-[var(--neon-blue)]" />, hint: 'Normal: 70-100 | Pre-diabetic: 100-125 | Diabetic: 126+', placeholder: 'e.g. 120' },
@@ -60,6 +63,7 @@ const DISEASE_STEPS: Record<string, WizardStep[]> = {
   heart: [
     { key: 'treatingDoctor', label: 'Treating Physician Name', type: 'text', icon: <Stethoscope className="text-[var(--neon-green)]" />, placeholder: 'Enter your doctor\'s name' },
     { key: 'patientName', label: 'Patient Name', type: 'text', icon: <Users className="text-[var(--neon-blue)]" />, placeholder: 'Enter patient name' },
+    { key: 'patientId', label: 'Patient Neural ID / Email', type: 'text', icon: <Fingerprint className="text-[var(--neon-purple)]" />, placeholder: 'e.g. patient@example.com' },
     { key: 'age', label: 'Patient Age', type: 'number', icon: <Calendar className="text-[var(--neon-purple)]" />, placeholder: 'e.g. 55' },
     { key: 'sex', label: 'Biological Sex', type: 'select-numeric', icon: <Users className="text-[var(--neon-blue)]" />, options: [{ value: '1', label: 'Male' }, { value: '0', label: 'Female' }] },
     { key: 'chestPain', label: 'Chest Pain Type', type: 'select-numeric', icon: <ShieldAlert className="text-[var(--neon-green)]" />, options: [{ value: '0', label: 'Typical Angina' }, { value: '1', label: 'Atypical Angina' }, { value: '2', label: 'Non-Anginal Pain' }, { value: '3', label: 'Asymptomatic' }] },
@@ -72,6 +76,7 @@ const DISEASE_STEPS: Record<string, WizardStep[]> = {
   mental: [
     { key: 'treatingDoctor', label: 'Treating Physician Name', type: 'text', icon: <Stethoscope className="text-[var(--neon-green)]" />, placeholder: 'Enter your doctor\'s name' },
     { key: 'patientName', label: 'Patient Name', type: 'text', icon: <Users className="text-[var(--neon-blue)]" />, placeholder: 'Enter patient name' },
+    { key: 'patientId', label: 'Patient Neural ID / Email', type: 'text', icon: <Fingerprint className="text-[var(--neon-purple)]" />, placeholder: 'e.g. patient@example.com' },
     { key: 'age', label: 'Patient Age', type: 'number', icon: <Calendar className="text-[var(--neon-purple)]" />, placeholder: 'e.g. 30' },
     { key: 'gender', label: 'Gender', type: 'select-numeric', icon: <Users className="text-[var(--neon-blue)]" />, options: [{ value: '0', label: 'Male' }, { value: '1', label: 'Female' }, { value: '2', label: 'Non-Binary / Other' }] },
     { key: 'familyHistory', label: 'Family History of Mental Illness?', type: 'select-numeric', icon: <Hash className="text-[var(--neon-green)]" />, options: [{ value: '1', label: 'Yes' }, { value: '0', label: 'No' }] },
@@ -164,7 +169,7 @@ const Diagnosis: React.FC = () => {
     // SURGICAL REMOVAL: For patients, identity fields are completely removed from the wizard
     if (user && user.role === 'patient') {
       diseaseInputs = diseaseInputs.filter(step => 
-        step.key !== 'treatingDoctor' && step.key !== 'patientName'
+        step.key !== 'treatingDoctor' && step.key !== 'patientName' && step.key !== 'patientId'
       );
     }
     
@@ -196,6 +201,10 @@ const Diagnosis: React.FC = () => {
           }
           
           if (wizardSteps[targetStep]?.key === 'patientName') {
+            targetStep++;
+          }
+
+          if (wizardSteps[targetStep]?.key === 'patientId') {
             targetStep++;
           }
           
@@ -234,7 +243,9 @@ const Diagnosis: React.FC = () => {
   // Voice Diagnosis mode state
   const [voiceDisease, setVoiceDisease] = useState('diabetes');
   const [voiceRecording, setVoiceRecording] = useState(false);
+  const [voiceLanguage, setVoiceLanguage] = useState<'en-IN' | 'hi-IN' | 'en-US'>('en-IN');
   const [voiceProcessing, setVoiceProcessing] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceResult, setVoiceResult] = useState<any>(null);
   const speechRecognitionRef = useRef<any>(null);
 
@@ -310,9 +321,9 @@ const Diagnosis: React.FC = () => {
     }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = true;
+    recognition.continuous = false; // Better for discrete command-based diagnostics
     recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    recognition.lang = voiceLanguage;
 
     let finalText = '';
 
@@ -362,6 +373,11 @@ const Diagnosis: React.FC = () => {
         .then(data => {
           if (data.status === 'success') {
             setVoiceResult(data);
+            // Auto-speak the narrative if available
+            if (data.clinical_narrative || data.consensus_intelligence?.narrative) {
+              const textToSpeak = data.clinical_narrative || data.consensus_intelligence?.narrative;
+              speakNarrative(textToSpeak);
+            }
           } else {
             setVoiceResult({ error: data.error || 'Voice diagnosis failed.' });
           }
@@ -380,7 +396,31 @@ const Diagnosis: React.FC = () => {
     recognition.start();
     setVoiceRecording(true);
     setVoiceResult(null);
-  }, [voiceDisease]);
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+  }, [voiceDisease, voiceLanguage]);
+
+  const speakNarrative = (text: string) => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    
+    const cleanText = text.replace(/[*#\[\]]/g, '').replace(/([.?!])\s*/g, '$1   ');
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = voiceLanguage.startsWith('hi') ? 'hi-IN' : 'en-IN';
+    utterance.rate = 0.9;
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const stopSpeaking = () => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  };
 
   const stopVoiceDiagnosis = useCallback(() => {
     if (speechRecognitionRef.current && voiceRecording) {
@@ -461,7 +501,7 @@ const Diagnosis: React.FC = () => {
         prescription: features.prescription,
         disease: features.disease,
         patient_name: features.patientName || user?.name || 'Unknown Patient',
-        patient_id: targetPatientId || (user?.role === 'patient' ? user?.email : 'web_user'),
+        patient_id: targetPatientId || features.patientId || (user?.role === 'patient' ? user?.id || user?.email : 'web_user'),
         treating_doctor: features.treatingDoctor || assignedPhysician || (user?.role === 'doctor' ? user?.name : 'Primary Physician Sync'),
         treating_doctor_id: (user?.role === 'doctor' ? user?.id || user?.email : undefined) 
       };
@@ -829,20 +869,32 @@ const Diagnosis: React.FC = () => {
                The AI will extract parameters, fill in any gaps, and run the full prediction.
                <br/><span className="text-cyan-500">Prescription is optional</span> — medications will be auto-suggested.
              </p>
-
-             {/* Disease selector */}
-             <div className="w-full max-w-sm">
-               <label className="text-xs text-gray-500 uppercase tracking-widest block mb-2">Diagnostic Protocol</label>
-               <select
-                 value={voiceDisease}
-                 onChange={(e) => { setVoiceDisease(e.target.value); setVoiceResult(null); }}
-                 className="glass-input w-full text-center text-lg p-3 rounded-xl appearance-none cursor-pointer"
-               >
-                 <option value="diabetes" className="bg-[#090a0f]">Diabetes Protocol</option>
-                 <option value="heart" className="bg-[#090a0f]">Heart Disease Protocol</option>
-                 <option value="mental" className="bg-[#090a0f]">Mental Health Protocol</option>
-               </select>
-             </div>
+              <div className="w-full max-w-sm flex gap-3">
+                <div className="flex-1 text-left">
+                  <label className="text-[10px] text-gray-500 uppercase tracking-widest block mb-2">Protocol</label>
+                  <select
+                    value={voiceDisease}
+                    onChange={(e) => { setVoiceDisease(e.target.value); setVoiceResult(null); }}
+                    className="glass-input w-full text-center text-sm p-3 rounded-xl appearance-none cursor-pointer"
+                  >
+                    <option value="diabetes" className="bg-[#090a0f]">Diabetes</option>
+                    <option value="heart" className="bg-[#090a0f]">Heart Disease</option>
+                    <option value="mental" className="bg-[#090a0f]">Mental Health</option>
+                  </select>
+                </div>
+                <div className="flex-1 text-left">
+                  <label className="text-[10px] text-gray-500 uppercase tracking-widest block mb-2">Language</label>
+                  <select
+                    value={voiceLanguage}
+                    onChange={(e) => setVoiceLanguage(e.target.value as any)}
+                    className="glass-input w-full text-center text-sm p-3 rounded-xl appearance-none cursor-pointer"
+                  >
+                    <option value="en-IN" className="bg-[#090a0f]">English (IN)</option>
+                    <option value="hi-IN" className="bg-[#090a0f]">Hindi (IN)</option>
+                    <option value="en-US" className="bg-[#090a0f]">English (US)</option>
+                  </select>
+                </div>
+              </div>
 
              {/* Example prompt */}
              <div className="w-full max-w-lg bg-white/5 border border-white/10 rounded-xl p-4 text-left">

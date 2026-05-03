@@ -31,28 +31,32 @@ export interface PatientRecord {
 }
 
 export const usePatientData = () => {
+  const [loading, setLoading] = useState<boolean>(false);
   const { user } = useAuth();
   const [history, setHistory] = useState<PatientRecord[]>([]);
 
-  const loadData = async () => {
+  const loadData = async (patientId?: string) => {
     if (!user) return;
+    setLoading(true);
     try {
-      const result = await getHistoryAPI(user.email, user.role);
+      const result = await getHistoryAPI(user.email, user.role, patientId);
       if (result && result.status === 'success') {
         const mappedHistory: PatientRecord[] = (result.history || []).map((r: any) => ({
-          id: r.patient_id || r.id || r._id,
-          mongoId: r.id || r._id,
+          // Critical: Use the MongoDB _id for the React key to ensure uniqueness
+          id: String(r.id || r._id || Math.random().toString()),
+          patientId: String(r.patient_id || r.user_id || 'Unknown'),
+          mongoId: String(r.id || r._id || ''),
           patientName: r.patient_name || 'Anonymous',
-          doctorId: r.treating_doctor_id || r.doctor_id || 'System',
+          doctorId: String(r.treating_doctor_id || r.doctor_id || 'System'),
           doctorEmail: r.doctor_email || '',
-          timestamp: r.timestamp || new Date().toISOString(),
-          glucose: r.glucose || 0,
-          bloodPressure: r.blood_pressure || r.bloodPressure || 0,
-          bmi: r.bmi || 0,
-          risk: r.risk || 'Low',
-          confidence: r.confidence || 0,
+          timestamp: r.timestamp || r.date || new Date().toISOString(),
+          glucose: Number(r.glucose || 0),
+          bloodPressure: Number(r.blood_pressure || r.bloodPressure || 0),
+          bmi: Number(r.bmi || 0),
+          risk: String(r.risk || 'Low'),
+          confidence: Number(r.confidence || 0),
           matchedDrugs: r.matched_drugs || r.matchedDrugs || [],
-          disease: r.disease || r.disease_type || 'General',
+          disease: String(r.disease || r.disease_type || 'General'),
           autoMedications: r.auto_medications || [],
           recommendations: r.recommendations || {},
           prescription_image: r.prescription_image
@@ -60,7 +64,25 @@ export const usePatientData = () => {
         setHistory(mappedHistory);
       }
     } catch (err) {
-      console.error('History Fetch Failed:', err);
+      console.error('Failed to load history:', err);
+      // Inject a visible error record so the UI isn't just blank
+      setHistory([{
+        id: 'error_node',
+        patientId: 'ERROR',
+        patientName: 'Connection Failure',
+        timestamp: new Date().toISOString(),
+        disease: 'System Offline',
+        risk: 'High',
+        doctorId: 'Network',
+        glucose: 0,
+        bloodPressure: 0,
+        confidence: 0,
+        autoMedications: [],
+        recommendations: {},
+        mongoId: 'error'
+      } as any]);
+    } finally {
+      setLoading(false);
     }
   };
 

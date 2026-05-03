@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Search, Loader2, Mic, Square, Bell, AlertCircle, CheckCircle } from 'lucide-react';
 import DoctorPatientAssignment from '../../components/DoctorPatientAssignment';
@@ -156,6 +157,31 @@ const DoctorDashboard: React.FC = () => {
             Clinical Command Station
           </h1>
           <p className="text-sm text-white/50 mt-1">Lead Physician: <span className="text-orange-400 font-bold">Dr. {user?.name}</span> • Platform Rank: {user?.clinical_rank || 95}%</p>
+          
+          {/* PERFORMANCE SIGNAL DISPLAY */}
+          <div className="mt-4 flex items-center gap-4">
+            <div className={`px-4 py-1.5 rounded-xl border flex items-center gap-3 ${
+              data?.performance_signal === 'red' ? 'bg-red-500/10 border-red-500/30' :
+              data?.performance_signal === 'yellow' ? 'bg-yellow-500/10 border-yellow-500/30' :
+              'bg-green-500/10 border-green-500/30'
+            }`}>
+              <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${
+                data?.performance_signal === 'red' ? 'bg-red-500 shadow-[0_0_10px_red]' :
+                data?.performance_signal === 'yellow' ? 'bg-yellow-500 shadow-[0_0_10px_yellow]' :
+                'bg-green-500 shadow-[0_0_10px_green]'
+              }`} />
+              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${
+                data?.performance_signal === 'red' ? 'text-red-400' :
+                data?.performance_signal === 'yellow' ? 'text-yellow-400' :
+                'text-green-400'
+              }`}>
+                {data?.performance_signal || 'GREEN'} SIGNAL
+              </span>
+            </div>
+            {data?.admin_signal_note && (
+              <p className="text-xs text-white/40 italic">"{data.admin_signal_note}"</p>
+            )}
+          </div>
         </div>
         <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-full flex items-center gap-3">
            <div className={`w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]`} />
@@ -214,7 +240,12 @@ const DoctorDashboard: React.FC = () => {
                          <p className="text-xs text-white/30 font-mono uppercase">{res.diagnosis}</p>
                        </div>
                     </div>
-                    <button className="px-4 py-2 text-[10px] bg-white/5 hover:bg-white/10 text-white/60 font-bold uppercase tracking-widest rounded-lg transition-all">View Dossier</button>
+                    <Link 
+                      to={`/history?search=${res.patient_id}`}
+                      className="px-4 py-2 text-[10px] bg-white/5 hover:bg-white/10 text-white/60 font-bold uppercase tracking-widest rounded-lg transition-all"
+                    >
+                      View Dossier
+                    </Link>
                   </div>
                 ))}
               </div>

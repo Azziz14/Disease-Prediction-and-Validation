@@ -43,11 +43,15 @@ const AdminDashboard: React.FC = () => {
   const [pingMessage, setPingMessage] = useState('');
   const [sendingPing, setSendingPing] = useState(false);
 
-  // Feedback State
   const [feedback, setFeedback] = useState<any[]>([]);
   const [flaggingDoctor, setFlaggingDoctor] = useState<string | null>(null);
   const [flagReason, setFlagReason] = useState('');
   const [submittingFlag, setSubmittingFlag] = useState(false);
+
+  // Signal State
+  const [signalModal, setSignalModal] = useState<{ open: boolean; docId: string; docName: string; currentSignal: string }>({ open: false, docId: '', docName: '', currentSignal: 'green' });
+  const [signalNote, setSignalNote] = useState('');
+  const [submittingSignal, setSubmittingSignal] = useState(false);
 
   const handleSendPing = async () => {
     if (!pingMessage.trim()) return;
@@ -118,6 +122,28 @@ const AdminDashboard: React.FC = () => {
     setSubmittingFlag(false);
   };
 
+  const handleSetSignal = async (signal: string) => {
+    setSubmittingSignal(true);
+    try {
+      await fetch(`http://${window.location.hostname}:5000/api/set-doctor-signal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          doctor_id: signalModal.docId,
+          signal,
+          admin_note: signalNote
+        })
+      });
+      alert(`Performance signal updated to ${signal.toUpperCase()}`);
+      setSignalModal({ ...signalModal, open: false });
+      // Refresh data
+      window.location.reload(); 
+    } catch (e) {
+      console.error(e);
+    }
+    setSubmittingSignal(false);
+  };
+
   if (loading) return (
     <div className="flex items-center justify-center h-96">
       <div className="text-center">
@@ -131,11 +157,27 @@ const AdminDashboard: React.FC = () => {
   
   // Filter patients
   const filteredPatients = patients.filter((p: any) => {
-    if (filterRisk !== 'all' && p.risk !== filterRisk) return false;
-    if (filterDisease !== 'all' && p.disease !== filterDisease) return false;
+    // Risk filter: use .includes for flexibility (e.g. "High Risk Evaluation" matches "High")
+    if (filterRisk !== 'all') {
+      const pRisk = (p.risk || "").toLowerCase();
+      const fRisk = filterRisk.toLowerCase();
+      if (!pRisk.includes(fRisk)) return false;
+    }
+    
+    // Disease filter: use .includes (e.g. "Heart Disease" matches "heart")
+    if (filterDisease !== 'all') {
+      const pDisease = (p.disease || "").toLowerCase();
+      const fDisease = filterDisease.toLowerCase();
+      if (!pDisease.includes(fDisease)) return false;
+    }
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      return p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q) || p.doctor?.toLowerCase().includes(q);
+      return (
+        (p.name || "").toLowerCase().includes(q) || 
+        (p.id || "").toLowerCase().includes(q) || 
+        (p.doctor || "").toLowerCase().includes(q)
+      );
     }
     return true;
   });
@@ -451,13 +493,22 @@ const AdminDashboard: React.FC = () => {
 
                 <div className="flex items-center gap-8">
                   <div className="text-center">
-                    <p className="text-[10px] text-white/40 uppercase font-bold mb-1">Rank</p>
-                    <p className={`text-sm font-bold ${doc.rank > 90 ? 'text-green-400' : 'text-orange-400'}`}>{doc.rank}%</p>
+                    <p className="text-[10px] text-white/40 uppercase font-bold mb-1">Status</p>
+                    <div className="flex justify-center">
+                      <div className={`w-3 h-3 rounded-full ${
+                        doc.performance_signal === 'red' ? 'bg-red-500 shadow-[0_0_10px_red]' : 
+                        doc.performance_signal === 'yellow' ? 'bg-yellow-500 shadow-[0_0_10px_yellow]' : 
+                        'bg-green-500 shadow-[0_0_10px_green]'
+                      }`} />
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-[10px] text-white/40 uppercase font-bold mb-1">Errors (Flags)</p>
-                    <p className={`text-sm font-bold ${doc.errors > 0 ? 'text-red-400' : 'text-white/60'}`}>{doc.errors}</p>
-                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setSignalModal({ open: true, docId: doc.id, docName: doc.name, currentSignal: doc.performance_signal }); setSignalNote(doc.admin_signal_note || ''); }}
+                    className="p-2 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:border-cyan-500/50 hover:text-cyan-400 transition-all"
+                    title="Set Signal"
+                  >
+                    <Shield size={16} />
+                  </button>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setPingModal({ open: true, docId: doc.id, docName: doc.name }); }}
                     className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-all"
@@ -580,6 +631,49 @@ const AdminDashboard: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* ═══ SIGNAL MODAL ═══ */}
+      <AnimatePresence>
+        {signalModal.open && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-[#0f172a] border border-cyan-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-white">Performance Signal: Dr. {signalModal.docName}</h3>
+                <button onClick={() => setSignalModal({ ...signalModal, open: false })} className="text-white/40 hover:text-white">✕</button>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                {[
+                  { id: 'green', label: 'Good', color: 'bg-green-500', shadow: 'shadow-green-500/40' },
+                  { id: 'yellow', label: 'Warning', color: 'bg-yellow-500', shadow: 'shadow-yellow-500/40' },
+                  { id: 'red', label: 'Critical', color: 'bg-red-500', shadow: 'shadow-red-500/40' }
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => handleSetSignal(s.id)}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${
+                      signalModal.currentSignal === s.id ? 'bg-white/10 border-white/40' : 'bg-black/20 border-white/5 hover:border-white/20'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-full ${s.color} ${s.shadow} shadow-lg`} />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">{s.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <p className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-2">Administrative Note</p>
+              <textarea 
+                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-cyan-500 transition-all h-24 mb-6 text-sm"
+                placeholder="Attach a reason or instruction for this signal change..."
+                value={signalNote}
+                onChange={(e) => setSignalNote(e.target.value)}
+              />
+              
+              <p className="text-[10px] text-white/30 text-center italic">Select a color to update the physician's live performance signal.</p>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* ═══ FLAG MODAL ═══ */}
       <AnimatePresence>

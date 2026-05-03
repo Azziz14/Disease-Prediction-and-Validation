@@ -313,9 +313,16 @@ export const downloadReportPDF = async (recordId: string): Promise<void> => {
   }
 };
 
-export const getHistoryAPI = async (email: string, role: string): Promise<{ status: string; history: any[] } | null> => {
+export const getHistoryAPI = async (email: string, role: string, patientId?: string): Promise<{ status: string; history: any[] } | null> => {
   try {
-    const response = await fetch(`${BASE_URL}/history?email=${email}&role=${role}`);
+    const url = new URL(`${BASE_URL}/history`);
+    url.searchParams.append('email', email);
+    url.searchParams.append('role', role);
+    if (patientId) url.searchParams.append('patient_id', patientId);
+    // Cache bust to ensure fresh data on account switch
+    url.searchParams.append('_t', Date.now().toString());
+    
+    const response = await fetch(url.toString());
     if (!response.ok) return null;
     return await response.json();
   } catch (err) {

@@ -51,7 +51,7 @@ def warmup():
     return {"status": "All services preloaded - analysis now fast!"}
 
 if __name__ == "__main__":
-    print("STARTING BACKEND IN STABILIZATION MODE (debug=False)...")
+    print("STARTING BACKEND IN DEVELOPMENT MODE (debug=True)...")
     ensure_default_admin() 
     warmup_all()  
-    app.run(host='0.0.0.0', debug=False, port=5000)
+    app.run(host='0.0.0.0', debug=True, port=5000)

@@ -146,7 +146,9 @@ const InsightsPanel: React.FC<{ predictionResult: any; disease?: string }> = ({ 
                     <div key={idx} className="relative pl-6 border-l border-white/10 group">
                       <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-cyan-500/50 group-hover:bg-cyan-400 transition-colors" />
                       <p className="text-[10px] font-black text-cyan-300 uppercase leading-none mb-1">{String(time)}</p>
-                      <p className="text-xs text-white/80">{String(task)}</p>
+                      <p className="text-xs text-white/80">
+                        {typeof task === 'object' ? String(task.name || task.purpose || 'Directive') : String(task)}
+                      </p>
                     </div>
                   );
                 })}

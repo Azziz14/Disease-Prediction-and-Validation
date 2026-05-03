@@ -15,13 +15,17 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def get_openai_client():
-    api_key = os.getenv("OPENAI_API_KEY", "").strip() or os.getenv("OPENROUTER_API_KEY", "").strip()
-    return api_key
+def get_api_credentials():
+    return {
+        "groq": os.getenv("GROQ_API_KEY", "").strip(),
+        "openrouter": os.getenv("OPENROUTER_API_KEY", "").strip(),
+        "openai": os.getenv("OPENAI_API_KEY", "").strip()
+    }
 
 @ocr_bp.route('/upload-prescription', methods=['POST'])
 def upload_prescription():
-    """Upload and analyze prescription image using OpenAI Vision."""
+    """Upload and analyze prescription image using Multimodal Vision (Groq -> OpenRouter -> OpenAI)."""
+    import requests
     try:
         if 'file' not in request.files:
             return jsonify({"error": "No file provided"}), 400
@@ -33,10 +37,7 @@ def upload_prescription():
         if not allowed_file(file.filename):
             return jsonify({"error": "File type not allowed."}), 400
         
-        api_key = get_openai_client()
-        if not api_key:
-            return jsonify({"error": "OpenAI API key not configured"}), 503
-
+        creds = get_api_credentials()
         image_bytes = file.read()
         base64_image = base64.b64encode(image_bytes).decode('utf-8')
         
@@ -58,53 +59,68 @@ def upload_prescription():
         }
         """
 
-        req_body = {
-            "model": "gpt-4o-mini",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                    ]
-                }
-            ],
-            "max_tokens": 800,
-            "temperature": 0.2
-        }
-        
-        api_url = "https://api.openai.com/v1/chat/completions"
-        if api_key.startswith("sk-or-v1"):
-            api_url = "https://openrouter.ai/api/v1/chat/completions"
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                ]
+            }
+        ]
 
-        req = urllib.request.Request(
-            api_url,
-            data=json.dumps(req_body).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}",
-                "HTTP-Referer": "http://localhost:3000",
-                "X-Title": "Healthcare AI Platform"
-            },
-            method="POST",
-        )
+        providers = [
+            {"name": "groq", "key": creds["groq"], "url": "https://api.groq.com/openai/v1/chat/completions", "model": "llama-3.2-11b-vision-preview"},
+            {"name": "openrouter", "key": creds["openrouter"], "url": "https://openrouter.ai/api/v1/chat/completions", "model": "google/gemini-2.0-flash-001"},
+            {"name": "openai", "key": creds["openai"], "url": "https://api.openai.com/v1/chat/completions", "model": "gpt-4o-mini"}
+        ]
+
+        for p in providers:
+            if not p["key"]: continue
+            try:
+                print(f"[OCR] Attempting vision analysis via {p['name']}...")
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {p['key']}"
+                }
+                if p["name"] == "openrouter":
+                    headers["HTTP-Referer"] = "http://localhost:3000"
+                    headers["X-Title"] = "Healthcare AI Platform"
+
+                payload = {
+                    "model": p["model"],
+                    "messages": messages,
+                    "max_tokens": 1000,
+                    "temperature": 0.2
+                }
+                
+                response = requests.post(p["url"], headers=headers, json=payload, timeout=30)
+                if response.status_code == 200:
+                    content = response.json()["choices"][0]["message"]["content"].strip()
+                    if content.startswith("```json"):
+                        content = content.replace("```json", "").replace("```", "").strip()
+                    
+                    extracted_data = json.loads(content)
+                    extracted_data["filename"] = secure_filename(file.filename)
+                    extracted_data["processed_at"] = datetime.utcnow().isoformat()
+                    extracted_data["provider"] = p["name"]
+                    
+                    print(f"[OCR] SUCCESS via {p['name']}")
+                    return jsonify({
+                        "status": "success",
+                        "data": extracted_data,
+                        "extracted_data": extracted_data
+                    })
+                else:
+                    print(f"[OCR] {p['name']} API Error: {response.status_code} - {response.text}")
+            except Exception as e:
+                print(f"[OCR] {p['name']} call failed: {e}")
+
+        return jsonify({"error": "All Vision AI providers failed or were not configured."}), 503
         
-        with urllib.request.urlopen(req, timeout=40) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
-            
-        content = body.get("choices", [])[0].get("message", {}).get("content", "").strip()
-        if content.startswith("```json"):
-            content = content[7:-3]
-            
-        extracted_data = json.loads(content)
-        extracted_data["filename"] = secure_filename(file.filename)
-        extracted_data["processed_at"] = datetime.utcnow().isoformat()
-        
-        return jsonify({
-            "status": "success",
-            "data": extracted_data,
-            "extracted_data": extracted_data
-        })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"Vision processing failed: {str(e)}"}), 500
         
     except Exception as e:
         traceback.print_exc()
