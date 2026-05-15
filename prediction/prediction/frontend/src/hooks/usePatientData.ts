@@ -4,6 +4,7 @@ import { getHistoryAPI } from '../services/api';
 
 export interface PatientRecord {
   id: string;
+  patientId: string;
   mongoId?: string;
   patientName?: string;
   doctorId: string;
@@ -14,19 +15,26 @@ export interface PatientRecord {
   bmi: number;
   risk: string;
   confidence: number;
-  matchedDrugs: string[];
+  matchedDrugs: any[];
   disease: string;
   prescription_image?: string;
+  drugInteractions?: string[];
+  prescriptionEvaluation?: {
+    score: number;
+    details: string[];
+  };
   autoMedications?: Array<{
     name?: string;
     dosage?: string;
     frequency?: string;
     note?: string;
+    purpose?: string;
   }>;
   recommendations?: {
     lifestyle?: string[];
     medical?: string[];
     precautions?: string[];
+    summary?: string;
   };
 }
 
@@ -59,7 +67,9 @@ export const usePatientData = () => {
           disease: String(r.disease || r.disease_type || 'General'),
           autoMedications: r.auto_medications || [],
           recommendations: r.recommendations || {},
-          prescription_image: r.prescription_image
+          prescription_image: r.prescription_image,
+          drugInteractions: r.drug_interactions || [],
+          prescriptionEvaluation: r.prescription_evaluation
         }));
         setHistory(mappedHistory);
       }

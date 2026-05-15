@@ -18,7 +18,7 @@ interface PatientData {
   glucose: number;
   blood_pressure: number;
   bmi: number;
-  matched_drugs: string[];
+  matched_drugs: any[];
   recommendations: any;
   auto_medications: any[];
 }
@@ -359,7 +359,7 @@ const AdminDashboard: React.FC = () => {
                               ) : patient.matched_drugs && patient.matched_drugs.length > 0 ? (
                                 <div className="space-y-1">
                                   {patient.matched_drugs.slice(0, 3).map((drug, idx) => (
-                                    <p key={`drug-${idx}`} className="text-xs text-gray-700">- {typeof drug === 'object' ? String(drug.name || drug.purpose || 'Drug') : String(drug)}</p>
+                                    <p key={`drug-${idx}`} className="text-xs text-gray-700">- {typeof drug === 'object' ? String((drug as any).name || (drug as any).purpose || 'Drug') : String(drug)}</p>
                                   ))}
                                 </div>
                               ) : (
@@ -376,7 +376,7 @@ const AdminDashboard: React.FC = () => {
                                     ...(patient.recommendations.medical || []),
                                     ...(patient.recommendations.precautions || [])
                                   ].slice(0, 4).map((item, idx) => (
-                                    <p key={`rec-${idx}`} className="text-xs text-green-800">- {typeof item === 'object' ? String(item.name || item.purpose || 'Directive') : String(item)}</p>
+                                    <p key={`rec-${idx}`} className="text-xs text-green-800">- {typeof item === 'object' ? String((item as any).name || (item as any).purpose || 'Directive') : String(item)}</p>
                                   ))}
                                 </div>
                               )}

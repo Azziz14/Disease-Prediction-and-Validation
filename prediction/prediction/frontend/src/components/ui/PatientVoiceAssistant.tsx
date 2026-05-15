@@ -25,6 +25,7 @@ interface PredictionRecord {
 
 interface MedicationSuggestion {
   name?: string;
+  purpose?: string;
   dosage?: string;
   frequency?: string;
   note?: string;
@@ -269,7 +270,7 @@ const buildAssistantReply = (
     }
 
     const previousSameDisease = predictions
-      .filter((entry) => entry.disease === contextLog.disease && entry.timestamp && entry.timestamp < contextLog.timestamp)
+      .filter((entry) => entry.disease === contextLog.disease && entry.timestamp && entry.timestamp < (contextLog.timestamp!))
       .sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''))[0];
 
     if (!previousSameDisease) {

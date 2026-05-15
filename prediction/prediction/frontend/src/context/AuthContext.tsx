@@ -8,6 +8,7 @@ export interface User {
   email: string;
   name: string;
   role: Role;
+  clinical_rank?: number;
 }
 
 interface AuthContextType {

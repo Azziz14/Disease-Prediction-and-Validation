@@ -140,7 +140,7 @@ const slideVariants = {
     y: dir === 'forward' ? -40 : 40,
     scale: 1.02,
     filter: 'blur(10px)',
-    transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] }
+    transition: { duration: 0.3, ease: 'easeInOut' as const }
   }),
 };
 
@@ -515,18 +515,7 @@ const Diagnosis: React.FC = () => {
         setApiError(response.error);
       } else {
         setResult(response);
-        addRecord({
-          glucose: Number(features.glucose || 0), bloodPressure: Number(features.bloodPressure || features.restingBP || 0),
-          bmi: Number(features.bmi || 0), risk: response.risk, confidence: response.confidence,
-          matchedDrugs: response.matched_drugs || [],
-          disease: response.disease || features.disease,
-          autoMedications: response.auto_medications || [],
-          recommendations: response.recommendations || {},
-          drugInteractions: response.drug_interactions || [],
-          prescriptionEvaluation: response.prescription_evaluation || undefined,
-          treatingDoctor: response.treating_doctor || features.treatingDoctor,
-          patientName: response.patient_name || features.patientName
-        });
+        addRecord();
       }
     } catch {
       setApiError("CRITICAL FAILURE — Neural uplink connection lost. Check that the Flask backend is running and reachable.");

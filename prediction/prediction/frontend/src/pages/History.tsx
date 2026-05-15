@@ -212,7 +212,7 @@ const History: React.FC = () => {
                                     ...(record.recommendations?.precautions || [])
                                   ].slice(0, 8).map((item, idx) => (
                                     <p key={`care-${idx}`} className="text-xs text-emerald-800">
-                                      - {typeof item === 'object' ? String(item.name || item.purpose || 'Recommendation') : String(item)}
+                                      - {typeof item === 'object' ? String((item as any).name || (item as any).purpose || 'Recommendation') : String(item)}
                                     </p>
                                   ))}
                                 </div>
@@ -229,7 +229,7 @@ const History: React.FC = () => {
                                    className="relative group cursor-zoom-in"
                                    onClick={(e) => {
                                      e.stopPropagation();
-                                     setModalImage(record.prescription_image);
+                                     setModalImage(record.prescription_image ?? null);
                                    }}
                                  >
                                    <img 

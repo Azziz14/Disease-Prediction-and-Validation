@@ -908,7 +908,7 @@ const PatientDashboard: React.FC = () => {
                    {isExpanded && (
                      <div className="mt-6 space-y-4 animate-in fade-in duration-300">
                         <div className="p-4 rounded-2xl bg-black/40 border border-white/5">
-                           <p style={{ fontSize: '10px', text_cyan_300_50: 'rgba(34,211,238,0.5)', uppercase: 'uppercase', mb: '8px' }}>Narrative & AI Insight</p>
+                           <p style={{ fontSize: '10px', color: 'rgba(34,211,238,0.5)', textTransform: 'uppercase', marginBottom: '8px' }}>Narrative & AI Insight</p>
                            <p className="text-sm text-white/80 italic leading-relaxed">
                               {p.clinical_narrative || p.recommendations?.summary || p.consensus_intelligence?.narrative || "Model inference successful. No further narrative logged."}
                            </p>

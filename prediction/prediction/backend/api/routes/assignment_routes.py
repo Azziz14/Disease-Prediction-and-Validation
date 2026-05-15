@@ -180,15 +180,40 @@ def get_patient_assignment():
         
     try:
         if db_client.db is not None:
-            patient = db_client.db.patients.find_one({"$or": [{"user_id": patient_id}, {"_id": patient_id}, {"name": patient_id}]})
+            # Search patients collection first (by user_id, _id, or name)
+            patient = db_client.db.patients.find_one({
+                "$or": [
+                    {"user_id": patient_id},
+                    {"_id": patient_id},
+                    {"name": patient_id}
+                ]
+            })
+
+            # If not in patients collection, check if user has direct assignment in users collection
             if not patient:
-                return jsonify({"error": "Patient not found"}), 404
+                user_doc = db_client.db.users.find_one({
+                    "$or": [{"id": patient_id}, {"user_id": patient_id}]
+                })
+                if user_doc:
+                    # Use user's user_id to find patient record
+                    uid = user_doc.get("user_id") or user_doc.get("id")
+                    patient = db_client.db.patients.find_one({"user_id": uid})
+
+            if not patient:
+                return jsonify({"status": "success", "assigned": False})
                 
             doc_id = patient.get("treating_doctor")
             if not doc_id:
                 return jsonify({"status": "success", "assigned": False})
-                
-            doc = db_client.db.users.find_one({"$or": [{"user_id": doc_id}, {"_id": doc_id}]})
+
+            # Find doctor by any ID format
+            doc = db_client.db.users.find_one({
+                "$or": [
+                    {"user_id": doc_id},
+                    {"id": doc_id},
+                    {"_id": doc_id}
+                ]
+            })
             return jsonify({
                 "status": "success", 
                 "assigned": True,
