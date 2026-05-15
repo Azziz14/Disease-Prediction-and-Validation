@@ -15,7 +15,7 @@ env/
 
 # Python cache and testing
 __pycache__/
-*.py[cod]\
+*.py[cod]
 *$py.class
 .pytest_cache/
 .tox/

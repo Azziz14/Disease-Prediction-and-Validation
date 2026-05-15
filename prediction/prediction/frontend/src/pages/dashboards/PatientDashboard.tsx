@@ -65,9 +65,17 @@ const PatientDashboard: React.FC = () => {
   const [inboxReply, setInboxReply] = useState('');
   const [sendingInbox, setSendingInbox] = useState(false);
 
+  // Stable refs for polling so interval never gets lost
+  const userRef = React.useRef(user);
+  const assignedDoctorRef = React.useRef(assignedDoctor);
+  React.useEffect(() => { userRef.current = user; }, [user]);
+  React.useEffect(() => { assignedDoctorRef.current = assignedDoctor; }, [assignedDoctor]);
+
+  const BASE_URL = `${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}`;
+
   useEffect(() => {
-    // Fetch assigned doctor
-    fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/patient-assignment?patient_id=${user?.id}`)
+    if (!user?.id) return;
+    fetch(`${BASE_URL}/api/patient-assignment?patient_id=${user.id}`)
       .then(res => res.json())
       .then(res => {
         if (res.status === 'success' && res.assigned) {
@@ -75,45 +83,54 @@ const PatientDashboard: React.FC = () => {
         }
       })
       .catch(err => console.error('Failed to fetch assigned doctor:', err));
-  }, [user]);
+  }, [user, BASE_URL]);
 
   const fetchInboxHistory = React.useCallback(() => {
-    if (!user?.id || !assignedDoctor?.id) return;
-    fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/chat/history?user_a=${user.id}&user_b=${assignedDoctor.id}`)
+    const u = userRef.current;
+    const doc = assignedDoctorRef.current;
+    if (!u?.id || !doc?.id) return;
+
+    fetch(`${BASE_URL}/api/chat/history?user_a=${u.id}&user_b=${doc.id}`)
       .then(res => res.json())
       .then(res => {
         if (res.status === 'success') {
           setInboxHistory(res.messages || []);
         }
-      });
-  }, [user?.id, assignedDoctor?.id]);
+      })
+      .catch(err => console.error('Failed to fetch chat history:', err));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // Stable polling: starts once when tab changes to 'inbox' and runs every 4 seconds
   useEffect(() => {
-    if (activeTab === 'inbox') {
-      fetchInboxHistory();
-      const timer = setInterval(fetchInboxHistory, 6000);
-      return () => clearInterval(timer);
-    }
+    if (activeTab !== 'inbox') return;
+    fetchInboxHistory();
+    const timer = setInterval(fetchInboxHistory, 4000);
+    return () => clearInterval(timer);
   }, [activeTab, fetchInboxHistory]);
 
   const handleSendInbox = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inboxReply.trim() || !user?.id || !assignedDoctor?.id) return;
+    const u = userRef.current;
+    const doc = assignedDoctorRef.current;
+    if (!inboxReply.trim() || !u?.id || !doc?.id) return;
+    
     setSendingInbox(true);
     try {
-      await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/chat/send-universal`, {
+      await fetch(`${BASE_URL}/api/chat/send-universal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sender_id: user.id,
-          recipient_id: assignedDoctor.id,
-          sender_name: user.name || 'Patient',
+          sender_id: u.id,
+          recipient_id: doc.id,
+          sender_name: u.name || 'Patient',
           sender_role: 'patient',
           recipient_role: 'doctor',
           message: inboxReply
         })
       });
       setInboxReply('');
+      // Force immediate refresh after sending message
       fetchInboxHistory();
     } catch (err) {
       console.error(err);
@@ -121,6 +138,11 @@ const PatientDashboard: React.FC = () => {
       setSendingInbox(false);
     }
   };
+
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [inboxHistory]);
 
   const submitFeedback = async () => {
     if (!feedbackMessage.trim() || !assignedDoctor || !user?.id) {
@@ -997,11 +1019,11 @@ const PatientDashboard: React.FC = () => {
                 </div>
               ) : (
                 inboxHistory.map((msg, idx) => {
-                  const isMe = msg.sender === 'patient';
+                  const isMe = msg.sender_id === user?.id || msg.sender === 'patient';
                   return (
                     <div key={idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                      <span className="text-[10px] text-white/30 mb-1 px-2 uppercase tracking-widest">{msg.sender_name}</span>
-                      <div className={`px-4 py-3 rounded-2xl max-w-[80%] ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white/10 text-white/90 rounded-bl-none'}`}>
+                      <span className="text-[10px] text-white/30 mb-1 px-2 uppercase tracking-widest">{msg.sender_name || (isMe ? 'You' : `Dr. ${assignedDoctor.name}`)}</span>
+                      <div className={`px-4 py-3 rounded-2xl max-w-[80%] text-sm leading-relaxed ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white/10 text-white/90 rounded-bl-none'}`}>
                         {msg.message}
                       </div>
                       <span className="text-[9px] text-white/20 mt-1 px-2">
@@ -1011,6 +1033,7 @@ const PatientDashboard: React.FC = () => {
                   );
                 })
               )}
+              <div ref={messagesEndRef} />
             </div>
 
             <div className="p-4 bg-white/5 border-t border-white/5">
