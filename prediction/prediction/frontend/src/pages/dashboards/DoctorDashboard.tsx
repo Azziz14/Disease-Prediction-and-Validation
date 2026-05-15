@@ -134,6 +134,7 @@ const DoctorDashboard: React.FC = () => {
     }
   };
 
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const lastMsgCount = React.useRef(0);
   React.useEffect(() => {
     if (inboxHistory.length > lastMsgCount.current) {
