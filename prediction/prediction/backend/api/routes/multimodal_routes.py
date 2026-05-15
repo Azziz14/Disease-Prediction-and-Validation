@@ -706,6 +706,7 @@ def get_clinical_outbox():
 def get_universal_chat_history():
     user_a = request.args.get("user_a")
     user_b = request.args.get("user_b")
+    print(f"[CHAT_DEBUG] Fetching history: user_a={user_a}, user_b={user_b}")
     if not user_a or not user_b:
         return jsonify({"error": "Missing participants"}), 400
         
@@ -717,10 +718,9 @@ def get_universal_chat_history():
             ]
         }
         messages = list(db_client.db.universal_messages.find(query).sort("timestamp", 1))
+        print(f"[CHAT_DEBUG] Found {len(messages)} messages for pair.")
         for m in messages:
             m['_id'] = str(m['_id'])
-            # Normalise: add a 'sender' role field so frontend can detect isMe correctly
-            # If sender_id matches user_a, sender = role of user_a; else role of user_b
             if not m.get('sender'):
                 m['sender'] = m.get('sender_role', 'unknown')
         return jsonify({"status": "success", "messages": messages})
@@ -731,12 +731,14 @@ def send_universal_message():
     data = request.json or {}
     sender_id = data.get("sender_id")
     recipient_id = data.get("recipient_id")
+    print(f"[CHAT_DEBUG] Sending message: sender={sender_id}, recip={recipient_id}")
     sender_name = data.get("sender_name", "Unknown")
     sender_role = data.get("sender_role", "patient")
     recipient_role = data.get("recipient_role", "")
     message = data.get("message")
     
     if not sender_id or not recipient_id or not message:
+        print(f"[CHAT_DEBUG] FAILED: Missing params. sender={sender_id}, recip={recipient_id}, msg={message is not None}")
         return jsonify({"error": "Missing parameters"}), 400
         
     # RESTRICTION ENFORCED: Patients blocked from initiating admin chats

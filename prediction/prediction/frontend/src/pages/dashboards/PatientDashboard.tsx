@@ -140,9 +140,12 @@ const PatientDashboard: React.FC = () => {
     }
   };
 
-  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const lastMsgCount = React.useRef(0);
   React.useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (inboxHistory.length > lastMsgCount.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    lastMsgCount.current = inboxHistory.length;
   }, [inboxHistory]);
 
   const submitFeedback = async () => {
@@ -1008,6 +1011,9 @@ const PatientDashboard: React.FC = () => {
                 <MessageSquare size={20} className="text-blue-400" />
                 Direct Inbox with Dr. {assignedDoctor.name}
               </h2>
+            </div>
+            <div className="flex flex-col items-end">
+               <span className="text-[9px] text-blue-400/60 font-mono">My ID: {user?.id} | Target: {assignedDoctor.id}</span>
             </div>
           </div>
 

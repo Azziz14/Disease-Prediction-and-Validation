@@ -134,9 +134,12 @@ const DoctorDashboard: React.FC = () => {
     }
   };
 
-  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const lastMsgCount = React.useRef(0);
   React.useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (inboxHistory.length > lastMsgCount.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    lastMsgCount.current = inboxHistory.length;
   }, [inboxHistory]);
 
   useEffect(() => {
@@ -351,8 +354,11 @@ const DoctorDashboard: React.FC = () => {
               <p className="text-sm text-white/50 mt-1">Direct channel to platform administrators and patients.</p>
             </div>
             
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-white/40 uppercase tracking-widest">Active Thread:</span>
+            <div className="flex items-center gap-4">
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] text-white/40 uppercase tracking-widest">Active Thread:</span>
+                <span className="text-[9px] text-blue-400/60 font-mono">My ID: {user?.id} | Target: {selectedThread}</span>
+              </div>
               <select 
                 value={selectedThread}
                 onChange={(e) => setSelectedThread(e.target.value)}
