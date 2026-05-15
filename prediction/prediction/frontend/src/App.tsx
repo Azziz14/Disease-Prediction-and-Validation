@@ -11,7 +11,7 @@ import Auth from './pages/Auth';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import DashboardLayout from './pages/DashboardLayout';
 import Dashboard from './pages/Dashboard';
-import AdminDashboard from './pages/AdminDashboard';
+import AdminDashboard from './pages/dashboards/AdminDashboard';
 import History from './pages/History';
 
 const App: React.FC = () => {

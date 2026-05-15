@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Mail, Search, Shield, ChevronDown, ChevronUp, Users, TrendingUp, AlertTriangle } from 'lucide-react';
-import { getAdminPatientsAPI } from '../services/api';
+import { Activity, Mail, Search, Shield, ChevronDown, ChevronUp, Users, TrendingUp, AlertTriangle, Star, MessageSquare } from 'lucide-react';
+import { getAdminPatientsAPI, getAllFeedbackAPI } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer } from 'recharts';
 import DoctorPatientAssignment from '../components/DoctorPatientAssignment';
 
 interface PatientData {
+  record_id?: string;
   patient_id: string;
   patient_name: string;
   doctor_id: string;
@@ -33,11 +34,30 @@ const AdminDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [riskFilter, setRiskFilter] = useState('all');
   const [diseaseFilter, setDiseaseFilter] = useState('all');
-  const [expandedPatientId, setExpandedPatientId] = useState<string | null>(null);
+  const [expandedPatientId, setExpandedPatientId] = useState<string | null>(null); // Retain name but store unique identifier key
+  
+  // Feedback and Review States
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [loadingFeedbacks, setLoadingFeedbacks] = useState(true);
 
   useEffect(() => {
     fetchAdminData();
+    fetchFeedbackData();
   }, []);
+
+  const fetchFeedbackData = async () => {
+    try {
+      setLoadingFeedbacks(true);
+      const result = await getAllFeedbackAPI();
+      if (result && result.status === 'success') {
+        setFeedbacks(result.data || []);
+      }
+    } catch (e) {
+      console.error('Failed loading reviews:', e);
+    } finally {
+      setLoadingFeedbacks(false);
+    }
+  };
 
   const fetchAdminData = async () => {
     try {
@@ -251,57 +271,59 @@ const AdminDashboard: React.FC = () => {
             </thead>
             <tbody>
               {filteredPatients.length > 0 ? (
-                filteredPatients.map((patient) => (
-                  <React.Fragment key={patient.patient_id}>
-                    <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="px-5 py-4 font-medium text-gray-900">{patient.patient_id}</td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className="h-6 w-6 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-xs font-bold">
-                            {patient.patient_name ? patient.patient_name.charAt(0).toUpperCase() : 'P'}
+                filteredPatients.map((patient, idx) => {
+                  const uniqueKey = patient.record_id || `${patient.patient_id}_${patient.timestamp || idx}`;
+                  return (
+                    <React.Fragment key={uniqueKey}>
+                      <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                        <td className="px-5 py-4 font-medium text-gray-900">{patient.patient_id}</td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="h-6 w-6 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-xs font-bold">
+                              {patient.patient_name ? patient.patient_name.charAt(0).toUpperCase() : 'P'}
+                            </div>
+                            <span className="text-gray-900">{patient.patient_name || 'Unknown Patient'}</span>
                           </div>
-                          <span className="text-gray-900">{patient.patient_name || 'Unknown Patient'}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">
-                            {patient.doctor_name.charAt(0).toUpperCase()}
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">
+                              {patient.doctor_name.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-gray-900">{patient.doctor_name}</span>
                           </div>
-                          <span className="text-gray-900">{patient.doctor_name}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-1 text-gray-600">
-                          <Mail size={12} />
-                          <span className="text-xs">{patient.doctor_email}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-gray-600">
-                        {new Date(patient.timestamp).toLocaleDateString()}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className="inline-block text-xs bg-gray-100 border border-gray-200 rounded-full px-2.5 py-0.5 font-medium capitalize text-gray-700">
-                          {patient.disease}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">{riskBadge(patient.risk)}</td>
-                      <td className="px-5 py-4">
-                        <span className="font-semibold text-gray-900">{(patient.confidence * 100).toFixed(1)}%</span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <button
-                          type="button"
-                          onClick={() => setExpandedPatientId(expandedPatientId === patient.patient_id ? null : patient.patient_id)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-                        >
-                          {expandedPatientId === patient.patient_id ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                          {expandedPatientId === patient.patient_id ? 'Hide' : 'Expand'}
-                        </button>
-                      </td>
-                    </tr>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-1 text-gray-600">
+                            <Mail size={12} />
+                            <span className="text-xs">{patient.doctor_email}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-gray-600">
+                          {new Date(patient.timestamp).toLocaleDateString()}
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="inline-block text-xs bg-gray-100 border border-gray-200 rounded-full px-2.5 py-0.5 font-medium capitalize text-gray-700">
+                            {patient.disease}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">{riskBadge(patient.risk)}</td>
+                        <td className="px-5 py-4">
+                          <span className="font-semibold text-gray-900">{(patient.confidence * 100).toFixed(1)}%</span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedPatientId(expandedPatientId === uniqueKey ? null : uniqueKey)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                          >
+                            {expandedPatientId === uniqueKey ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                            {expandedPatientId === uniqueKey ? 'Hide' : 'Expand'}
+                          </button>
+                        </td>
+                      </tr>
 
-                    {expandedPatientId === patient.patient_id && (
+                      {expandedPatientId === uniqueKey && (
                       <tr className="border-b border-gray-100 bg-gray-50/60">
                         <td colSpan={9} className="px-5 py-4">
                           <div className="grid gap-4 md:grid-cols-3">
@@ -364,7 +386,7 @@ const AdminDashboard: React.FC = () => {
                       </tr>
                     )}
                   </React.Fragment>
-                ))
+                )})
               ) : (
                 <tr>
                   <td colSpan={9} className="px-6 py-14 text-center">
@@ -376,6 +398,74 @@ const AdminDashboard: React.FC = () => {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════ */}
+      {/* PATIENT FEEDBACK & PHYSICIAN REVIEWS                     */}
+      {/* ═══════════════════════════════════════════════════════ */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+          <div>
+            <h2 className="text-xl font-display font-bold text-gray-900 flex items-center gap-2 tracking-tight">
+              <MessageSquare size={22} className="text-indigo-600" />
+              Physician Performance Feedback
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5 uppercase tracking-wider font-semibold">Patient satisfaction & Clinical reviews</p>
+          </div>
+          <span className="bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">
+            {feedbacks.length} Response{feedbacks.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+
+        {loadingFeedbacks ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+          </div>
+        ) : feedbacks.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {feedbacks.map((fb, idx) => (
+              <div 
+                key={fb._id || idx} 
+                className="group bg-gray-50/60 hover:bg-white border border-gray-200 hover:border-indigo-300 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 relative flex flex-col"
+              >
+                <div className="flex-1">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md text-sm font-bold group-hover:scale-105 transition-transform duration-300">
+                        {(fb.patient_name || 'P').charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-gray-900">{fb.patient_name || 'Anonymous Patient'}</h4>
+                        <p className="text-[10px] text-indigo-600 font-bold tracking-wider mt-0.5">FOR: DR. {fb.doctor_name?.toUpperCase() || 'PHYSICIAN'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-gray-200 shadow-sm">
+                      <Star size={12} className="text-yellow-400 fill-yellow-400" />
+                      <span className="text-xs font-bold text-gray-800">{fb.rating || 5}</span>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <p className="text-gray-700 text-sm leading-relaxed italic bg-white p-3.5 rounded-xl border border-gray-100 mb-4 min-h-[60px] group-hover:shadow-[inset_0_0_10px_rgba(0,0,0,0.01)] transition-all">
+                      "{fb.message}"
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-gray-400 border-t border-gray-100 pt-3.5 mt-auto font-medium">
+                  <span className="font-mono">REF ID: #{String(fb.patient_id || 'GUEST').substring(0, 8).toUpperCase()}</span>
+                  <span>
+                    {fb.timestamp ? new Date(fb.timestamp).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : 'N/A'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16 border-2 border-dashed border-gray-200 bg-gray-50/50 rounded-2xl">
+            <MessageSquare size={40} className="mx-auto text-gray-300 mb-3 animate-pulse" />
+            <h3 className="text-gray-700 font-semibold">No Performance Feedback Yet</h3>
+            <p className="text-gray-500 text-xs mt-1">Patient reviews regarding automated directives and physician service will populate here.</p>
+          </div>
+        )}
       </div>
 
       {/* Doctor-Patient Assignment Management */}

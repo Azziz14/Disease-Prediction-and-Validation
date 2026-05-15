@@ -293,6 +293,21 @@ export const getAdminPatientsAPI = async (): Promise<{
   }
 };
 
+export const getAllFeedbackAPI = async (): Promise<{
+  status: string;
+  data: any[];
+  error?: string;
+} | null> => {
+  try {
+    const response = await fetch(`${BASE_URL}/all-feedback`);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (err) {
+    console.error('All Feedback API Error:', err);
+    return null;
+  }
+};
+
 export const downloadReportPDF = async (recordId: string): Promise<void> => {
   try {
     const response = await fetch(`${BASE_URL}/generate-pdf/${recordId}`);

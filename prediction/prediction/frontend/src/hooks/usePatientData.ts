@@ -87,12 +87,20 @@ export const usePatientData = () => {
   };
 
   useEffect(() => {
-    loadData();
+    if (user && user.role === 'patient') {
+      loadData(user.id);
+    } else {
+      loadData();
+    }
   }, [user]);
 
-  // addRecord is now a no-op as the backend handles logging during prediction
+  // addRecord triggers an immediate fresh retrieval matching user context
   const addRecord = () => {
-    loadData();
+    if (user && user.role === 'patient') {
+      loadData(user.id);
+    } else {
+      loadData();
+    }
   };
 
   const clearHistory = () => {

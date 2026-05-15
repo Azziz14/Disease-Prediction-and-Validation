@@ -36,36 +36,51 @@ pdf.add_page()
 pdf.section_title("1. Technology Stack")
 pdf.chapter_body(
     " - Frontend: React 18, TypeScript, Framer Motion (Cyberpunk/Clinical Aesthetics).\n"
+    "   [File Location: frontend/package.json]\n"
     " - Backend: Flask (Python 3.10+) Orchestration Engine.\n"
+    "   [File Location: backend/app.py, backend/requirements.txt]\n"
     " - Database: MongoDB (Persistence for Medical Records & Predictions).\n"
-    " - AI Integration: Groq/OpenRouter (Llama 3.1 70B AI Narrative Engine)."
+    "   [File Location: backend/utils/db.py, backend/services/prediction_service.py]\n"
+    " - AI Integration: Groq/OpenRouter (Llama 3.3 70B, 3.2 11B Vision, 3.1 8B Instant Neural Engines).\n"
+    "   [File Location: backend/services/clinical_intelligence.py, backend/utils/translation.py]"
 )
 
 # 2. ML Models
 pdf.section_title("2. Machine Learning Architecture")
 pdf.chapter_body(
-    " - Ensemble Engine: Distributed Voting between XGBoost, Random Forest, and Gradient Boosting.\n"
+    " - Ensemble Engine: Bayesian-weighted soft voting & stacking combining XGBoost, Random Forest, Gradient Boosting, SVM, and Logistic Regression.\n"
+    "   [File Location: backend/models/ensemble_optimizer.py, backend/models/ml_models_enhanced.py]\n"
     " - Clinical Registry: Unified index mapping for Diabetes, Cardiac, and Mental Health protocols.\n"
-    " - Data Pipeline: Robust automated feature scaling and clinical data integrity layers."
+    "   [File Location: backend/utils/clinical_registry.py, backend/stabilize_registry.py]\n"
+    " - Data Pipeline: Robust automated feature scaling and clinical data integrity layers.\n"
+    "   [File Location: backend/models/dl_models_enhanced.py, backend/models/ml_models_enhanced.py]"
 )
 
 # 3. AI & Multimodal Pipelines
 pdf.section_title("3. Generative AI & Multimodal Pipelines")
 pdf.chapter_body(
-    " - Clinical Fusion: Hand-in-Hand synchronization between statistical ML and Generative AI narratives.\n"
-    " - Risk Escalation: AI-Driven Guardrail forced escalation for catastrophic biomarkers (BP 160+, BMI 45+).\n"
-    " - Vision Audit: EasyOCR handwriting clarity audit and pharmacological education logic.\n"
-    " - Voice Intelligence: Real-time STT with context-aware parameter extraction."
+    " - Clinical Fusion: Synchronization between statistical ML probability and Generative AI narratives.\n"
+    "   [File Location: backend/services/prediction_service.py]\n"
+    " - Risk Escalation: Forced escalation logic for catastrophic biomarkers (Glucose 250+, BP 160+, BMI 45+).\n"
+    "   [File Location: backend/services/prediction_service.py]\n"
+    " - Vision Audit: EasyOCR handwriting clarity audit and pharmacological recognition.\n"
+    "   [File Location: backend/services/ocr_service.py, backend/api/routes/ocr_routes.py]\n"
+    " - Voice Intelligence: AssemblyAI & Google Web STT with context-aware parameter extraction.\n"
+    "   [File Location: backend/services/audio_service.py, backend/services/voice_intake_service.py]"
 )
 
 # 4. Features & Guardrails
 pdf.section_title("4. Security & Clinical Features")
 pdf.chapter_body(
-    " - Fingerprint Persistence: Full historical logging of manual entry and visual scan evidence.\n"
-    " - Zero-Trust Guardrails: Absolute safety overrides prioritizing clinical consensus over ML probability.\n"
-    " - Multi-Language Intelligence: High-fidelity 'Hinglish' clinical transcreation engine."
+    " - Fingerprint Persistence: Historical logging of prediction entries and diagnostic events.\n"
+    "   [File Location: backend/services/prediction_service.py (MongoDB collections: medical_records, predictions)]\n"
+    " - Zero-Trust Guardrails: Safety overrides prioritizing clinical consensus protocols over raw ML probability.\n"
+    "   [File Location: backend/services/prediction_service.py]\n"
+    " - Multi-Language Intelligence: High-fidelity 'Hinglish' clinical transcreation using Llama 3.1 8B.\n"
+    "   [File Location: backend/utils/translation.py]"
 )
 
 output_path = "System_Architecture_and_Intelligence.pdf"
 pdf.output(output_path)
 print(f"PDF Successfully generated at: {output_path}")
+

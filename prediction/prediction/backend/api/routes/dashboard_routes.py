@@ -20,7 +20,8 @@ def _get_cached_data(cache_key):
     return None
 
 def _set_cached_data(cache_key, data):
-    _DASHBOARD_CACHE[cache_key] = (data, datetime.now())
+    if cache_key:
+        _DASHBOARD_CACHE[cache_key] = (data, datetime.now())
 
 def _get_fallback_data(role, user_id=None):
     """Return empty-state data when MongoDB is not available."""
@@ -54,6 +55,11 @@ def get_dashboard_data():
     user_id = request.args.get('user_id')
     role_str = str(role or '').strip().lower()
     is_clinical = 'admin' in role_str or 'doctor' in role_str
+    
+    cache_key = f"dash_{role_str}_{user_id or 'all'}"
+    cached_data = _get_cached_data(cache_key)
+    if cached_data:
+        return jsonify({"status": "success", "data": cached_data})
 
     try:
         # Try MongoDB first
@@ -299,6 +305,7 @@ def get_all_patients():
                     patient_counter += 1
                 
                 patient_info = {
+                    'record_id': str(pred.get('_id', '')),
                     'patient_id': patient_id,
                     'patient_name': pred.get('patient_name', f'Patient {patient_id}'),
                     'doctor_id': pred.get('doctor_id', ''),
