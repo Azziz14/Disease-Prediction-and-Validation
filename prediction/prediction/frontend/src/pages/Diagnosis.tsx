@@ -216,7 +216,7 @@ const Diagnosis: React.FC = () => {
     const resolvePatientDoctor = async () => {
       if (user && user.role === 'patient') {
         try {
-          const res = await fetch(`http://${window.location.hostname}:5000/api/patient-assignment?patient_id=${user.id}`);
+          const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/patient-assignment?patient_id=${user.id}`);
           const data = await res.json();
           if (data.status === 'success' && data.assigned) {
             setAssignedPhysician(data.doctor_name);
@@ -365,7 +365,7 @@ const Diagnosis: React.FC = () => {
       formData.append('text', text);
       formData.append('disease', voiceDisease);
 
-      fetch(`http://${window.location.hostname}:5000/api/voice-diagnosis`, {
+      fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/voice-diagnosis`, {
         method: 'POST',
         body: formData
       })

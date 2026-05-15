@@ -3,8 +3,8 @@ import os
 import traceback
 from dotenv import load_dotenv
 
-# Load environment variables early with absolute path
-env_path = r"c:\Users\ashis\Downloads\prediction (2)\prediction\prediction\.env"
+# Load environment variables early
+env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
 load_dotenv(env_path)
 print(f"[BOOT] Loaded .env from folder structure")
 print(f"[BOOT] Groq Key Loaded: {'Yes' if os.getenv('GROQ_API_KEY') else 'No'}")
@@ -51,7 +51,8 @@ def warmup():
     return {"status": "All services preloaded - analysis now fast!"}
 
 if __name__ == "__main__":
-    print("STARTING BACKEND IN DEVELOPMENT MODE (debug=True)...")
+    print("STARTING BACKEND IN DEVELOPMENT MODE...")
     ensure_default_admin() 
-    warmup_all()  
-    app.run(host='0.0.0.0', debug=True, port=5000)
+    warmup_all()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', debug=False, port=port)

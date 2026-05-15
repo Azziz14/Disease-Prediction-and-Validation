@@ -15,7 +15,7 @@ const DoctorDashboard: React.FC = () => {
   const [isListening, setIsListening] = useState(false);
 
   useEffect(() => {
-    fetch(`http://${window.location.hostname}:5000/api/dashboard-data?role=doctor&user_id=${user?.id}`)
+    fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/dashboard-data?role=doctor&user_id=${user?.id}`)
       .then(res => res.json())
       .then(res => {
         if(res.status === 'success') {
@@ -31,7 +31,7 @@ const DoctorDashboard: React.FC = () => {
 
   const clearNotifications = async () => {
     try {
-      await fetch(`http://${window.location.hostname}:5000/api/read-notifications`, {
+      await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/read-notifications`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ user_id: user?.id })
@@ -49,7 +49,7 @@ const DoctorDashboard: React.FC = () => {
     
     setSearching(true);
     try {
-      const res = await fetch(`http://${window.location.hostname}:5000/api/patient-history/search`, {
+      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/patient-history/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: query })

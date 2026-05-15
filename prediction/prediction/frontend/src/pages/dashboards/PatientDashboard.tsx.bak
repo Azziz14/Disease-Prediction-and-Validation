@@ -67,7 +67,7 @@ const PatientDashboard: React.FC = () => {
 
   useEffect(() => {
     // Fetch assigned doctor
-    fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/patient-assignment?patient_id=${user?.id}`)
+    fetch(`${process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}'}/api/patient-assignment?patient_id=${user?.id}`)
       .then(res => res.json())
       .then(res => {
         if (res.status === 'success' && res.assigned) {
@@ -79,7 +79,7 @@ const PatientDashboard: React.FC = () => {
 
   const fetchInboxHistory = React.useCallback(() => {
     if (!user?.id || !assignedDoctor?.id) return;
-    fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/chat/history?user_a=${user.id}&user_b=${assignedDoctor.id}`)
+    fetch(`${process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}'}/api/chat/history?user_a=${user.id}&user_b=${assignedDoctor.id}`)
       .then(res => res.json())
       .then(res => {
         if (res.status === 'success') {
@@ -101,7 +101,7 @@ const PatientDashboard: React.FC = () => {
     if (!inboxReply.trim() || !user?.id || !assignedDoctor?.id) return;
     setSendingInbox(true);
     try {
-      await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/chat/send-universal`, {
+      await fetch(`${process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}'}/api/chat/send-universal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -130,7 +130,7 @@ const PatientDashboard: React.FC = () => {
     setSubmittingFeedback(true);
     setFeedbackStatus(null);
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/submit-feedback`, {
+      const res = await fetch(`${process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}'}/api/submit-feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -160,7 +160,7 @@ const PatientDashboard: React.FC = () => {
     // SMART POLLING: Only fetch if the window is currently visible to the user
     if (document.hidden) return;
     
-    fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/dashboard-data?role=patient&user_id=${user?.id}`)
+    fetch(`${process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}'}/api/dashboard-data?role=patient&user_id=${user?.id}`)
       .then(res => res.json())
       .then(res => {
         if (res.status === 'success') {
@@ -191,7 +191,7 @@ const PatientDashboard: React.FC = () => {
     formData.append('disease', selectedDisease);
 
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/voice-diagnosis`, {
+      const res = await fetch(`${process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}'}/api/voice-diagnosis`, {
         method: 'POST',
         body: formData
       });
@@ -227,7 +227,7 @@ const PatientDashboard: React.FC = () => {
     formData.append('patient_id', user?.id || 'guest');
 
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/upload-prescription`, {
+      const res = await fetch(`${process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}'}/api/upload-prescription`, {
         method: 'POST',
         body: formData
       });

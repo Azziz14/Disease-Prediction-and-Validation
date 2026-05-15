@@ -74,9 +74,9 @@ const ReportPanel: React.FC<{ report: any }> = ({ report }) => {
         {report.recommendations && (
           <Section title="Recommendations" sectionKey="recs">
             <ul className="space-y-1.5">
-              {report.recommendations.map((r: string, i: number) => (
+              {report.recommendations.map((r: any, i: number) => (
                 <li key={i} className="flex items-start gap-2 text-sm text-text-secondary">
-                  <span className="text-brand mt-1">•</span> {r}
+                  <span className="text-brand mt-1">•</span> {typeof r === 'object' ? String(r.name || r.purpose || 'Directive') : String(r)}
                 </li>
               ))}
             </ul>

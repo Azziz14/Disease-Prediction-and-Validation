@@ -57,7 +57,7 @@ const AdminDashboard: React.FC = () => {
     if (!pingMessage.trim()) return;
     setSendingPing(true);
     try {
-      await fetch(`http://${window.location.hostname}:5000/api/send-ping`, {
+      await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/send-ping`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -76,7 +76,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    fetch(`http://${window.location.hostname}:5000/api/dashboard-data?role=admin`)
+    fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/dashboard-data?role=admin`)
       .then(res => res.json())
       .then(res => {
         if (res.status === 'success') {
@@ -90,7 +90,7 @@ const AdminDashboard: React.FC = () => {
       });
 
     // Fetch Feedback
-    fetch(`http://${window.location.hostname}:5000/api/all-feedback`)
+    fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/all-feedback`)
       .then(res => res.json())
       .then(res => {
         if (res.status === 'success') {
@@ -104,7 +104,7 @@ const AdminDashboard: React.FC = () => {
     if (!flaggingDoctor || !flagReason.trim()) return;
     setSubmittingFlag(true);
     try {
-      await fetch(`http://${window.location.hostname}:5000/api/flag-doctor`, {
+      await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/flag-doctor`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -125,7 +125,7 @@ const AdminDashboard: React.FC = () => {
   const handleSetSignal = async (signal: string) => {
     setSubmittingSignal(true);
     try {
-      await fetch(`http://${window.location.hostname}:5000/api/set-doctor-signal`, {
+      await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/set-doctor-signal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

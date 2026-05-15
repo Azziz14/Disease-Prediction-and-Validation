@@ -66,7 +66,7 @@ def get_dashboard_data():
         if db_client.db is not None:
             data = {}
             
-            if is_clinical:
+            if role_str == 'admin':
                 # 1. Fetch All Raw Data first
                 all_patients = list(db_client.db.patients.find({}))
                 patient_registry = {}
@@ -144,6 +144,11 @@ def get_dashboard_data():
                 
                 # 5. Doctor Registry
                 doctors = list(db_client.db.users.find({"role": "doctor"}))
+                
+                # Fetch all active flags to compute lookup set
+                active_flags_list = list(db_client.db.doctor_flags.find({"status": "active"}))
+                flagged_doctor_ids = {f.get("doctor_id") for f in active_flags_list if f.get("doctor_id")}
+                
                 doctor_registry = []
                 for d in doctors:
                     d_id = d.get("user_id") or str(d.get("_id"))
@@ -155,6 +160,7 @@ def get_dashboard_data():
                         "errors": d.get("wrong_prescription_count", 0),
                         "performance_signal": d.get("performance_signal", "green"),
                         "admin_signal_note": d.get("admin_signal_note", ""),
+                        "is_flagged": d_id in flagged_doctor_ids,
                         "patients": []
                     })
                 data['doctor_registry'] = doctor_registry
@@ -192,13 +198,29 @@ def get_dashboard_data():
                 for n in notifications: n['_id'] = str(n['_id'])
                 data['notifications'] = notifications
 
-                # Fetch flagging status
-                flags = list(db_client.db.doctor_flags.find({"doctor_id": user_id, "status": "active"}))
+                # Identify user document first to resolve aliases
+                user_query = {"$or": [{"user_id": user_id}, {"email": user_id}]}
+                try:
+                    from bson.objectid import ObjectId
+                    user_query["$or"].append({"_id": ObjectId(user_id)})
+                except:
+                    pass
+                user_doc = db_client.db.users.find_one(user_query)
+
+                # Fetch flagging status using all possible IDs to ensure robust cross-dashboard identity matching
+                possible_ids = [str(user_id)]
+                if user_doc:
+                    if user_doc.get("user_id"): possible_ids.append(str(user_doc.get("user_id")))
+                    if user_doc.get("_id"): possible_ids.append(str(user_doc.get("_id")))
+                
+                flags = list(db_client.db.doctor_flags.find({
+                    "doctor_id": {"$in": possible_ids}, 
+                    "status": "active"
+                }))
                 data['is_flagged'] = len(flags) > 0
                 data['active_flags'] = [{ "reason": f.get("reason"), "date": f.get("flagged_date").isoformat() if hasattr(f.get("flagged_date"), "isoformat") else str(f.get("flagged_date")) } for f in flags]
 
                 # Fetch performance signal
-                user_doc = db_client.db.users.find_one({"$or": [{"user_id": user_id}, {"email": user_id}]})
                 data['performance_signal'] = user_doc.get('performance_signal', 'green') if user_doc else 'green'
                 data['admin_signal_note'] = user_doc.get('admin_signal_note', '') if user_doc else ''
                 

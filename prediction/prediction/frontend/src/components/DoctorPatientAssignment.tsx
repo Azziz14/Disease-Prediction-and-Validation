@@ -32,7 +32,7 @@ const DoctorPatientAssignment: React.FC<DoctorPatientAssignmentProps> = ({ userR
     if (!userId) return;
     setLoading(true);
     try {
-      const response = await fetch(`http://${window.location.hostname}:5000/api/doctor-patients?doctor_id=${userId}`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/doctor-patients?doctor_id=${userId}`);
       const result = await response.json();
       if (result.status === 'success') {
         setAssignedPatients(result.data);
@@ -50,7 +50,7 @@ const DoctorPatientAssignment: React.FC<DoctorPatientAssignmentProps> = ({ userR
 
     setAssigning(true);
     try {
-      const response = await fetch(`http://${window.location.hostname}:5000/api/assign-patient`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/assign-patient`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -80,7 +80,7 @@ const DoctorPatientAssignment: React.FC<DoctorPatientAssignmentProps> = ({ userR
   const unassignPatient = async (patientId: string) => {
     if (!userId || !window.confirm('PERMANENTLY DISCONNECT PATIENT FROM REGISTRY?')) return;
     try {
-      await fetch(`http://${window.location.hostname}:5000/api/unassign-patient`, {
+      await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/unassign-patient`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ doctor_id: userId, patient_id: patientId })

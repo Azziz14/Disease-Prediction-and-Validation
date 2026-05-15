@@ -502,6 +502,25 @@ def send_ping():
             "read": False,
             "timestamp": datetime.datetime.utcnow().isoformat()
         })
+        
+        # 📬 TRIGGER SMTP MOCK PROTOCOL (@carepredict.ai)
+        try:
+            from utils.mailer import send_clinical_email
+            doctor = db_client.db.users.find_one({"id": doctor_id})
+            doctor_email = doctor.get("email") if (doctor and doctor.get("email")) else f"{doctor_id}@carepredict.ai"
+            
+            admin = db_client.db.users.find_one({"role": "admin"})
+            admin_email = admin.get("email") if (admin and admin.get("email")) else "admin@carepredict.ai"
+            
+            send_clinical_email(
+                to_email=doctor_email,
+                from_email=admin_email,
+                subject="🚨 [PRIORITY DIRECTIVE] Administrative Protocol Update",
+                body_text=f"Attention Dr. {doctor.get('name') if doctor else doctor_id},\n\nAn urgent system ping has been issued to your command station:\n\n'{message}'\n\nPlease audit your patient queues immediately.\n\n-- System Automation"
+            )
+        except Exception as ex:
+            print(f"[MAIL SIMULATOR ERR] Ping email failed: {str(ex)}")
+            
     return jsonify({"status": "success"})
 
 @multimodal_bp.route('/read-notifications', methods=['POST'])
@@ -603,3 +622,167 @@ def search_history():
         results = nlp.search_patient_history(query, records)
         return jsonify({"status": "success", "results": results})
     return jsonify({"error": "DB error"}), 500
+
+@multimodal_bp.route('/chat/admin-messages', methods=['GET'])
+def get_admin_messages():
+    doctor_id = request.args.get("doctor_id")
+    if not doctor_id:
+        return jsonify({"error": "doctor_id required"}), 400
+    if db_client.db is not None:
+        messages = list(db_client.db.admin_messages.find({"doctor_id": doctor_id}).sort("timestamp", 1))
+        for m in messages:
+            m['_id'] = str(m['_id'])
+        return jsonify({"status": "success", "messages": messages})
+    return jsonify({"status": "success", "messages": []})
+
+@multimodal_bp.route('/chat/send-message', methods=['POST'])
+def send_chat_message():
+    data = request.json or {}
+    doctor_id = data.get("doctor_id")
+    sender = data.get("sender", "doctor")
+    sender_name = data.get("sender_name", "Unknown")
+    message = data.get("message")
+    
+    if not doctor_id or not message:
+        return jsonify({"error": "Missing doctor_id or message"}), 400
+        
+    if db_client.db is not None:
+        import datetime
+        db_client.db.admin_messages.insert_one({
+            "doctor_id": doctor_id,
+            "sender": sender,
+            "sender_name": sender_name,
+            "message": message,
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        })
+        # Trigger secondary system notification for administrative overview
+        if sender == 'doctor':
+            db_client.db.notifications.insert_one({
+                "to_user_id": "admin",
+                "message": f"Message from Dr. {sender_name}: {message}",
+                "read": False,
+                "timestamp": datetime.datetime.utcnow().isoformat()
+            })
+            
+        # 📬 TRIGGER SMTP MOCK PROTOCOL FOR CHAT (@carepredict.ai)
+        try:
+            from utils.mailer import send_clinical_email
+            doctor = db_client.db.users.find_one({"id": doctor_id})
+            doctor_email = doctor.get("email") if (doctor and doctor.get("email")) else f"{doctor_id}@carepredict.ai"
+            
+            admin = db_client.db.users.find_one({"role": "admin"})
+            admin_email = admin.get("email") if (admin and admin.get("email")) else "admin@carepredict.ai"
+            
+            if sender == 'doctor':
+                to_addr = admin_email
+                from_addr = doctor_email
+                subj = f"💬 [CHAT] Correspondence packet from Dr. {sender_name}"
+            else:
+                to_addr = doctor_email
+                from_addr = admin_email
+                subj = f"💬 [CHAT] Administrative directive from Central Node"
+                
+            send_clinical_email(
+                to_email=to_addr,
+                from_email=from_addr,
+                subject=subj,
+                body_text=f"Secure Chat Line Transmission Block:\n\nSender: {sender_name}\nMessage:\n\"{message}\"\n\n-- Access secure dashboard to reply."
+            )
+        except Exception as ex:
+            print(f"[MAIL SIMULATOR ERR] Chat email failed: {str(ex)}")
+            
+    return jsonify({"status": "success"})
+
+@multimodal_bp.route('/clinical-outbox', methods=['GET'])
+def get_clinical_outbox():
+    if db_client.db is not None:
+        emails = list(db_client.db.clinical_outbox.find().sort("timestamp", -1))
+        for e in emails:
+            e['_id'] = str(e['_id'])
+        return jsonify({"status": "success", "emails": emails})
+    return jsonify({"status": "success", "emails": []})
+
+@multimodal_bp.route('/chat/history', methods=['GET'])
+def get_universal_chat_history():
+    user_a = request.args.get("user_a")
+    user_b = request.args.get("user_b")
+    if not user_a or not user_b:
+        return jsonify({"error": "Missing participants"}), 400
+        
+    if db_client.db is not None:
+        query = {
+            "$or": [
+                {"sender_id": user_a, "recipient_id": user_b},
+                {"sender_id": user_b, "recipient_id": user_a}
+            ]
+        }
+        messages = list(db_client.db.universal_messages.find(query).sort("timestamp", 1))
+        for m in messages:
+            m['_id'] = str(m['_id'])
+        return jsonify({"status": "success", "messages": messages})
+    return jsonify({"status": "success", "messages": []})
+
+@multimodal_bp.route('/chat/send-universal', methods=['POST'])
+def send_universal_message():
+    data = request.json or {}
+    sender_id = data.get("sender_id")
+    recipient_id = data.get("recipient_id")
+    sender_name = data.get("sender_name", "Unknown")
+    sender_role = data.get("sender_role", "patient")
+    recipient_role = data.get("recipient_role", "")
+    message = data.get("message")
+    
+    if not sender_id or not recipient_id or not message:
+        return jsonify({"error": "Missing parameters"}), 400
+        
+    # RESTRICTION ENFORCED: Patients blocked from initiating admin chats
+    if sender_role == 'patient':
+        if not recipient_role and db_client.db is not None:
+            recipient_user = db_client.db.users.find_one({"id": recipient_id})
+            recipient_role = recipient_user.get("role") if recipient_user else ""
+            
+        if recipient_role == 'admin' or 'admin' in recipient_id.lower():
+            return jsonify({
+                "status": "forbidden", 
+                "message": "Security Violation: Patients are restricted from direct administrative correspondence."
+            }), 403
+
+    if db_client.db is not None:
+        import datetime
+        db_client.db.universal_messages.insert_one({
+            "sender_id": sender_id,
+            "recipient_id": recipient_id,
+            "sender_name": sender_name,
+            "sender_role": sender_role,
+            "message": message,
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        })
+        
+        db_client.db.notifications.insert_one({
+            "to_user_id": recipient_id,
+            "message": f"New secure correspondence packet from {sender_name}",
+            "read": False,
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        })
+        
+        try:
+            from utils.mailer import send_clinical_email
+            sender_user = db_client.db.users.find_one({"id": sender_id})
+            recipient_user = db_client.db.users.find_one({"id": recipient_id})
+            
+            s_email = sender_user.get("email") if (sender_user and sender_user.get("email")) else f"{sender_id}@carepredict.ai"
+            r_email = recipient_user.get("email") if (recipient_user and recipient_user.get("email")) else f"{recipient_id}@carepredict.ai"
+            
+            send_clinical_email(
+                to_email=r_email,
+                from_email=s_email,
+                subject=f"💬 [COMMUNICATION] Direct message from {sender_name}",
+                body_text=f"Transmission Node:\nSender: {sender_name} ({sender_role})\n\n\"{message}\"\n\n-- Clinical Spooler Engine"
+            )
+        except Exception as ex:
+            print(f"[MAIL SIMULATOR ERR] Universal chat email failed: {str(ex)}")
+            
+    return jsonify({"status": "success"})
+
+
+

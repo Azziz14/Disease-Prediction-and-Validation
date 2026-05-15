@@ -264,17 +264,29 @@ def resolve_flag():
     """Resolve a doctor flag."""
     data = request.get_json()
     flag_id = data.get('flag_id')
-    resolution_notes = data.get('resolution_notes', '')
+    doctor_id = data.get('doctor_id')
+    resolution_notes = data.get('resolution_notes', 'Resolved by administrator.')
     resolved_by = data.get('resolved_by', 'admin')
     
-    if not flag_id:
-        return jsonify({"error": "flag_id is required"}), 400
+    if not flag_id and not doctor_id:
+        return jsonify({"error": "Either flag_id or doctor_id is required"}), 400
     
     try:
         if db_client.db is not None:
-            # Update flag status
-            result = db_client.db.doctor_flags.update_one(
-                {"_id": flag_id},
+            # Build query selector
+            query = {}
+            if flag_id:
+                from bson.objectid import ObjectId
+                try:
+                    query["_id"] = ObjectId(flag_id)
+                except:
+                    query["_id"] = flag_id
+            else:
+                query = {"doctor_id": doctor_id, "status": "active"}
+
+            # Update matching flags
+            result = db_client.db.doctor_flags.update_many(
+                query,
                 {
                     "$set": {
                         "status": "resolved",
@@ -285,13 +297,10 @@ def resolve_flag():
                 }
             )
             
-            if result.modified_count > 0:
-                return jsonify({
-                    "status": "success",
-                    "message": "Flag resolved successfully"
-                })
-            else:
-                return jsonify({"error": "Flag not found"}), 404
+            return jsonify({
+                "status": "success",
+                "message": f"Successfully resolved {result.modified_count} flags for Doctor"
+            })
         
         else:
             return jsonify({

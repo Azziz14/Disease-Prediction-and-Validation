@@ -3,7 +3,7 @@
  * Handles all communication with the backend Flask server
  */
 
-const BASE_URL = `http://${window.location.hostname}:5000/api`;
+const BASE_URL = `${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api`;
 
 /**
  * API Response Types

@@ -551,7 +551,7 @@ const PatientVoiceAssistant: React.FC<PatientVoiceAssistantProps> = ({
 
     // 1. ALWAYS Try the OpenAI API first for a generative, non-robotic response
     try {
-      const apiResponse = await fetch(`http://${window.location.hostname}:5000/api/assistant-chat`, {
+      const apiResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/assistant-chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
