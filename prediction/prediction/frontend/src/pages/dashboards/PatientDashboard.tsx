@@ -101,13 +101,14 @@ const PatientDashboard: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Stable polling: starts once when tab changes to 'inbox' and runs every 4 seconds
+  // Stable polling: starts once when tab changes to 'inbox' and runs every 2 seconds
   useEffect(() => {
     if (activeTab !== 'inbox') return;
+    if (!assignedDoctor?.id) return;
     fetchInboxHistory();
-    const timer = setInterval(fetchInboxHistory, 4000);
+    const timer = setInterval(fetchInboxHistory, 2000);
     return () => clearInterval(timer);
-  }, [activeTab, fetchInboxHistory]);
+  }, [activeTab, fetchInboxHistory, assignedDoctor]);
 
   const handleSendInbox = async (e: React.FormEvent) => {
     e.preventDefault();

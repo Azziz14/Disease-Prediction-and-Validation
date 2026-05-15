@@ -79,7 +79,7 @@ const DoctorDashboard: React.FC = () => {
   useEffect(() => {
     if (activeTab !== 'inbox') return;
     fetchInboxHistory();
-    const timer = setInterval(fetchInboxHistory, 4000);
+    const timer = setInterval(fetchInboxHistory, 2000);
     return () => clearInterval(timer);
   }, [activeTab, fetchInboxHistory]);
 
@@ -361,7 +361,7 @@ const DoctorDashboard: React.FC = () => {
                 <option value="admin" className="bg-[#0f172a]">🛡️ Platform Admin</option>
                 <optgroup label="Your Patients" className="bg-[#0f172a]">
                   {assignedPatients.map(p => (
-                    <option key={p.id} value={p.id} className="bg-[#0f172a]">👤 {p.name}</option>
+                    <option key={p.patient_id || p.id} value={p.patient_id || p.id} className="bg-[#0f172a]">👤 {p.patient_name || p.name}</option>
                   ))}
                 </optgroup>
               </select>

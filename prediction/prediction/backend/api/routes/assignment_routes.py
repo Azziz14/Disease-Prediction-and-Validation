@@ -45,7 +45,10 @@ def get_doctor_patients():
             result = []
             for patient in patients:
                 p_id = patient.get("user_id") or patient.get("id") or str(patient["_id"])
-                p_name = patient.get("name", "Unknown Patient")
+                
+                # Prefer the real name from the users collection (authoritative source)
+                user_doc = db_client.db.users.find_one({"user_id": p_id})
+                p_name = (user_doc.get("name") if user_doc else None) or patient.get("name", "Unknown Patient")
                 
                 # Fetch recent predictions for this patient
                 predictions = list(db_client.db.predictions.find({"patient_id": p_id}).sort("timestamp", -1).limit(5))
