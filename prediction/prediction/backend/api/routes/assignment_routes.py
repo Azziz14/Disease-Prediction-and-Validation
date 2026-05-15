@@ -16,33 +16,48 @@ def get_doctor_patients():
     
     try:
         if db_client.db is not None:
-            # ROBUST ID RESOLUTION (Mirrors dashboard_routes logic)
+            # Resolve ALL possible ID formats this doctor could be stored under
             doc_ids = [doctor_id]
             try:
                 doc_ids.append(ObjectId(doctor_id))
             except:
                 pass
             
-            user_doc = db_client.db.users.find_one({"$or": [{"user_id": doctor_id}, {"_id": doctor_id}]})
+            # Find the user document to get all their ID variants
+            user_doc = db_client.db.users.find_one({
+                "$or": [
+                    {"id": doctor_id},
+                    {"user_id": doctor_id},
+                    {"_id": doctor_id}
+                ]
+            })
             if user_doc:
+                if user_doc.get("id"): doc_ids.append(user_doc["id"])
                 if user_doc.get("user_id"): doc_ids.append(user_doc["user_id"])
-                doc_ids.append(user_doc["_id"])
+                doc_ids.append(str(user_doc["_id"]))
 
-            # Sync point: Fetch from the same master collection that the counter uses
+            # Deduplicate
+            doc_ids = list(set(str(d) for d in doc_ids))
+
+            # Fetch patients whose treating_doctor matches ANY of the doctor's IDs
             patients = list(db_client.db.patients.find({"treating_doctor": {"$in": doc_ids}}))
             
             result = []
             for patient in patients:
-                p_id = patient.get("user_id") or str(patient["_id"])
+                p_id = patient.get("user_id") or patient.get("id") or str(patient["_id"])
+                p_name = patient.get("name", "Unknown Patient")
                 
                 # Fetch recent predictions for this patient
                 predictions = list(db_client.db.predictions.find({"patient_id": p_id}).sort("timestamp", -1).limit(5))
                 for pred in predictions: pred["_id"] = str(pred["_id"])
 
                 result.append({
+                    # Return BOTH naming conventions so frontend works regardless
+                    "id": p_id,
+                    "name": p_name,
                     "patient_id": p_id,
-                    "patient_name": patient.get("name", "Unknown Patient"),
-                    "assigned_date": patient.get("created_at"),
+                    "patient_name": p_name,
+                    "assigned_date": str(patient.get("created_at", "")),
                     "predictions": predictions
                 })
             

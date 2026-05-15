@@ -719,6 +719,10 @@ def get_universal_chat_history():
         messages = list(db_client.db.universal_messages.find(query).sort("timestamp", 1))
         for m in messages:
             m['_id'] = str(m['_id'])
+            # Normalise: add a 'sender' role field so frontend can detect isMe correctly
+            # If sender_id matches user_a, sender = role of user_a; else role of user_b
+            if not m.get('sender'):
+                m['sender'] = m.get('sender_role', 'unknown')
         return jsonify({"status": "success", "messages": messages})
     return jsonify({"status": "success", "messages": []})
 

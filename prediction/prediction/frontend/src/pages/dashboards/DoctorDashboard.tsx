@@ -22,73 +22,102 @@ const DoctorDashboard: React.FC = () => {
   const [inboxReply, setInboxReply] = useState('');
   const [sendingInbox, setSendingInbox] = useState(false);
 
+  // Stable refs so polling interval never goes stale
+  const selectedThreadRef = React.useRef(selectedThread);
+  const userRef = React.useRef(user);
+  React.useEffect(() => { selectedThreadRef.current = selectedThread; }, [selectedThread]);
+  React.useEffect(() => { userRef.current = user; }, [user]);
+
+  const BASE_URL = `${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}`;
+
   const fetchAssignedPatients = React.useCallback(() => {
-    if (!user?.id) return;
-    fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/doctor-patients?doctor_id=${user.id}`)
+    const u = userRef.current;
+    if (!u?.id) return;
+    fetch(`${BASE_URL}/api/doctor-patients?doctor_id=${u.id}`)
       .then(res => res.json())
       .then(res => {
         if (res.status === 'success') setAssignedPatients(res.data || []);
       })
-      .catch(err => console.error("Inbox load error:", err));
-  }, [user?.id]);
+      .catch(err => console.error("Patient list error:", err));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchInboxHistory = React.useCallback(() => {
-    if (!user?.id) return;
-    if (selectedThread === 'admin') {
-      fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/chat/admin-messages?doctor_id=${user.id}`)
+    const u = userRef.current;
+    const thread = selectedThreadRef.current;
+    if (!u?.id) return;
+
+    if (thread === 'admin') {
+      fetch(`${BASE_URL}/api/chat/admin-messages?doctor_id=${u.id}`)
         .then(res => res.json())
         .then(res => {
           if (res.status === 'success') {
             const mapped = (res.messages || []).map((m: any) => ({
               ...m,
-              sender_id: m.sender === 'doctor' ? user.id : 'admin',
-              sender_name: m.sender === 'doctor' ? `Dr. ${user.name}` : 'PLATFORM ADMINISTRATOR'
+              sender_id: m.sender === 'doctor' ? u.id : 'admin',
+              sender_name: m.sender === 'doctor' ? `Dr. ${u.name}` : 'PLATFORM ADMINISTRATOR'
             }));
             setInboxHistory(mapped);
           }
         });
     } else {
-      fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/chat/history?user_a=${user.id}&user_b=${selectedThread}`)
+      fetch(`${BASE_URL}/api/chat/history?user_a=${u.id}&user_b=${thread}`)
         .then(res => res.json())
         .then(res => {
           if (res.status === 'success') setInboxHistory(res.messages || []);
         });
     }
-  }, [user, selectedThread]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // Load patients on mount
+  useEffect(() => {
+    fetchAssignedPatients();
+  }, [fetchAssignedPatients]);
+
+  // Stable polling: only one interval, never recreated
+  useEffect(() => {
+    if (activeTab !== 'inbox') return;
+    fetchInboxHistory();
+    const timer = setInterval(fetchInboxHistory, 4000);
+    return () => clearInterval(timer);
+  }, [activeTab, fetchInboxHistory]);
+
+  // Refresh history immediately when thread changes
   useEffect(() => {
     if (activeTab === 'inbox') {
-      fetchAssignedPatients();
+      setInboxHistory([]);
       fetchInboxHistory();
-      const timer = setInterval(fetchInboxHistory, 6000);
-      return () => clearInterval(timer);
     }
-  }, [activeTab, selectedThread, fetchInboxHistory, fetchAssignedPatients]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedThread]);
 
   const handleSendInbox = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inboxReply.trim() || !user?.id) return;
+    const u = userRef.current;
+    const thread = selectedThreadRef.current;
+    if (!inboxReply.trim() || !u?.id) return;
     setSendingInbox(true);
     try {
-      if (selectedThread === 'admin') {
-        await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/chat/send-message`, {
+      if (thread === 'admin') {
+        await fetch(`${BASE_URL}/api/chat/send-message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            doctor_id: user.id,
+            doctor_id: u.id,
             sender: 'doctor',
-            sender_name: user.name || 'Doctor',
+            sender_name: u.name || 'Doctor',
             message: inboxReply
           })
         });
       } else {
-        await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/chat/send-universal`, {
+        await fetch(`${BASE_URL}/api/chat/send-universal`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            sender_id: user.id,
-            recipient_id: selectedThread,
-            sender_name: `Dr. ${user.name || 'Physician'}`,
+            sender_id: u.id,
+            recipient_id: thread,
+            sender_name: `Dr. ${u.name || 'Physician'}`,
             sender_role: 'doctor',
             recipient_role: 'patient',
             message: inboxReply
@@ -96,6 +125,7 @@ const DoctorDashboard: React.FC = () => {
         });
       }
       setInboxReply('');
+      // Immediately fetch after send for instant feedback
       fetchInboxHistory();
     } catch (err) {
       console.error(err);
@@ -103,6 +133,11 @@ const DoctorDashboard: React.FC = () => {
       setSendingInbox(false);
     }
   };
+
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [inboxHistory]);
 
   useEffect(() => {
     fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/dashboard-data?role=doctor&user_id=${user?.id}`)
@@ -338,15 +373,16 @@ const DoctorDashboard: React.FC = () => {
               {inboxHistory.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-white/20">
                   <MessageSquare size={48} className="mb-4 opacity-20" />
-                  <p>No messages in this thread yet.</p>
+                  <p className="text-sm">No messages in this thread yet.</p>
+                  <p className="text-xs mt-2 opacity-60">Messages refresh every 4 seconds automatically.</p>
                 </div>
               ) : (
                 inboxHistory.map((msg, idx) => {
                   const isMe = msg.sender_id === user?.id || msg.sender === 'doctor';
                   return (
                     <div key={idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                      <span className="text-[10px] text-white/30 mb-1 px-2 uppercase tracking-widest">{msg.sender_name}</span>
-                      <div className={`px-4 py-3 rounded-2xl max-w-[80%] ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white/10 text-white/90 rounded-bl-none'}`}>
+                      <span className="text-[10px] text-white/30 mb-1 px-2 uppercase tracking-widest">{msg.sender_name || (isMe ? `Dr. ${user?.name}` : 'Patient')}</span>
+                      <div className={`px-4 py-3 rounded-2xl max-w-[80%] text-sm leading-relaxed ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white/10 text-white/90 rounded-bl-none'}`}>
                         {msg.message}
                       </div>
                       <span className="text-[9px] text-white/20 mt-1 px-2">
@@ -356,6 +392,7 @@ const DoctorDashboard: React.FC = () => {
                   );
                 })
               )}
+              <div ref={messagesEndRef} />
             </div>
 
             <div className="p-4 bg-white/5 border-t border-white/5">
