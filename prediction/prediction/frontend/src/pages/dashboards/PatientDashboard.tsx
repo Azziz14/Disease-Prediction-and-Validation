@@ -64,6 +64,7 @@ const PatientDashboard: React.FC = () => {
   const [inboxHistory, setInboxHistory] = useState<any[]>([]);
   const [inboxReply, setInboxReply] = useState('');
   const [sendingInbox, setSendingInbox] = useState(false);
+  const [hasUnread, setHasUnread] = useState(false);
 
   // Stable refs for polling so interval never gets lost
   const userRef = React.useRef(user);
@@ -94,12 +95,35 @@ const PatientDashboard: React.FC = () => {
       .then(res => res.json())
       .then(res => {
         if (res.status === 'success') {
-          setInboxHistory(res.messages || []);
+          const msgs = res.messages || [];
+          setInboxHistory(msgs);
+          
+          // Check for unread messages from the doctor
+          const u = userRef.current;
+          if (msgs.length > 0) {
+            const lastMsg = msgs[msgs.length - 1];
+            if (lastMsg.sender_id !== u?.id && lastMsg.read === false) {
+              setHasUnread(true);
+            }
+          }
         }
       })
       .catch(err => console.error('Failed to fetch chat history:', err));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Mark as read when tab is active
+  useEffect(() => {
+    if (activeTab === 'inbox' && assignedDoctor?.id) {
+      const u = userRef.current;
+      if (!u?.id) return;
+      fetch(`${BASE_URL}/api/chat/mark-read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reader_id: u.id, sender_id: assignedDoctor.id })
+      }).then(() => setHasUnread(false));
+    }
+  }, [activeTab, assignedDoctor, BASE_URL]);
 
   // Stable polling: starts once when tab changes to 'inbox' and runs every 2 seconds
   useEffect(() => {
@@ -792,7 +816,7 @@ const PatientDashboard: React.FC = () => {
         {assignedDoctor && (
           <button 
             onClick={() => setActiveTab('inbox')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all ${
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all relative ${
               activeTab === 'inbox' 
                 ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]' 
                 : 'text-white/40 hover:text-white hover:bg-white/5'
@@ -800,6 +824,9 @@ const PatientDashboard: React.FC = () => {
           >
             <MessageSquare size={18} />
             Direct Inbox
+            {hasUnread && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-[#0a0a0a] shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
+            )}
           </button>
         )}
       </div>

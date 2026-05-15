@@ -46,22 +46,29 @@ def get_doctor_patients():
             for patient in patients:
                 p_id = patient.get("user_id") or patient.get("id") or str(patient["_id"])
                 
-                # Prefer the real name from the users collection (authoritative source)
+                # Authoritative name lookup
                 user_doc = db_client.db.users.find_one({"user_id": p_id})
                 p_name = (user_doc.get("name") if user_doc else None) or patient.get("name", "Unknown Patient")
                 
-                # Fetch recent predictions for this patient
+                # UNREAD COUNT: Count messages from this patient to this doctor that are unread
+                unread_count = db_client.db.universal_messages.count_documents({
+                    "sender_id": p_id,
+                    "recipient_id": doctor_id,
+                    "read": {"$ne": True}
+                })
+                
+                # Fetch recent predictions
                 predictions = list(db_client.db.predictions.find({"patient_id": p_id}).sort("timestamp", -1).limit(5))
                 for pred in predictions: pred["_id"] = str(pred["_id"])
 
                 result.append({
-                    # Return BOTH naming conventions so frontend works regardless
                     "id": p_id,
                     "name": p_name,
                     "patient_id": p_id,
                     "patient_name": p_name,
                     "assigned_date": str(patient.get("created_at", "")),
-                    "predictions": predictions
+                    "predictions": predictions,
+                    "unread_count": unread_count
                 })
             
             return jsonify({"status": "success", "data": result})

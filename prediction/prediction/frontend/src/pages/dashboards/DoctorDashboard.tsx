@@ -83,14 +83,24 @@ const DoctorDashboard: React.FC = () => {
     return () => clearInterval(timer);
   }, [activeTab, fetchInboxHistory]);
 
-  // Refresh history immediately when thread changes
+  // Mark as read when thread changes or tab becomes active
   useEffect(() => {
+    if (activeTab === 'inbox' && selectedThread !== 'admin') {
+      const u = userRef.current;
+      if (!u?.id) return;
+      fetch(`${BASE_URL}/api/chat/mark-read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reader_id: u.id, sender_id: selectedThread })
+      }).then(() => fetchAssignedPatients()); // Refresh list to clear dot
+    }
+    
     if (activeTab === 'inbox') {
       setInboxHistory([]);
       fetchInboxHistory();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedThread]);
+  }, [selectedThread, activeTab]);
 
   const handleSendInbox = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -331,7 +341,7 @@ const DoctorDashboard: React.FC = () => {
             </button>
             <button 
               onClick={() => setActiveTab('inbox')}
-              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 relative ${
                 activeTab === 'inbox' 
                   ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]' 
                   : 'text-white/40 hover:text-white'
@@ -339,6 +349,9 @@ const DoctorDashboard: React.FC = () => {
             >
               <MessageSquare size={16} />
               Communications Hub
+              {assignedPatients.some(p => p.unread_count > 0) && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-[#0f172a] shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
+              )}
             </button>
           </div>
         </div>
@@ -368,7 +381,9 @@ const DoctorDashboard: React.FC = () => {
                 <option value="admin" className="bg-[#0f172a]">🛡️ Platform Admin</option>
                 <optgroup label="Your Patients" className="bg-[#0f172a]">
                   {assignedPatients.map(p => (
-                    <option key={p.patient_id || p.id} value={p.patient_id || p.id} className="bg-[#0f172a]">👤 {p.patient_name || p.name}</option>
+                    <option key={p.patient_id || p.id} value={p.patient_id || p.id} className="bg-[#0f172a]">
+                      {p.unread_count > 0 ? '🔴 ' : '👤 '}{p.patient_name || p.name} {p.unread_count > 0 ? `(${p.unread_count})` : ''}
+                    </option>
                   ))}
                 </optgroup>
               </select>

@@ -761,6 +761,7 @@ def send_universal_message():
             "sender_name": sender_name,
             "sender_role": sender_role,
             "message": message,
+            "read": False,
             "timestamp": datetime.datetime.utcnow().isoformat()
         })
         
@@ -789,6 +790,23 @@ def send_universal_message():
             print(f"[MAIL SIMULATOR ERR] Universal chat email failed: {str(ex)}")
             
     return jsonify({"status": "success"})
+
+@multimodal_bp.route('/chat/mark-read', methods=['POST'])
+def mark_chat_as_read():
+    data = request.json or {}
+    reader_id = data.get("reader_id")
+    sender_id = data.get("sender_id")
+    
+    if not reader_id or not sender_id:
+        return jsonify({"error": "Missing IDs"}), 400
+        
+    if db_client.db is not None:
+        db_client.db.universal_messages.update_many(
+            {"sender_id": sender_id, "recipient_id": reader_id, "read": {"$ne": True}},
+            {"$set": {"read": True}}
+        )
+        return jsonify({"status": "success"})
+    return jsonify({"error": "DB offline"}), 500
 
 
 
