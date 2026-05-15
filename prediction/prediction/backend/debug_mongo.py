@@ -1,7 +1,8 @@
+import os
 import pymongo
 import certifi
 
-client = pymongo.MongoClient("mongodb+srv://ashishking554_db_user:Azziizz%4014@diseasepredictionvalida.dlayq9m.mongodb.net/?appName=DiseasePredictionValidation", tlsCAFile=certifi.where())
+client = pymongo.MongoClient(os.environ.get("MONGO_URI", ""), tlsCAFile=certifi.where())
 db = client["DiseasePredictionValidation"]
 
 print("--- DOCTOR FLAGS ---")

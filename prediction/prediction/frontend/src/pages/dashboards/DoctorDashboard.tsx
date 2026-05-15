@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Search, Loader2, Mic, Square, Bell, AlertCircle, CheckCircle } from 'lucide-react';
+import { Search, Loader2, Mic, Square, Bell, AlertCircle, CheckCircle, Send, MessageSquare, MessageCircle } from 'lucide-react';
 import DoctorPatientAssignment from '../../components/DoctorPatientAssignment';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -13,6 +13,96 @@ const DoctorDashboard: React.FC = () => {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [isListening, setIsListening] = useState(false);
+
+  // --- Unified Dashboard Inbox Refactoring ---
+  const [activeTab, setActiveTab] = useState<'overview' | 'inbox'>('overview');
+  const [selectedThread, setSelectedThread] = useState<'admin' | string>('admin');
+  const [assignedPatients, setAssignedPatients] = useState<any[]>([]);
+  const [inboxHistory, setInboxHistory] = useState<any[]>([]);
+  const [inboxReply, setInboxReply] = useState('');
+  const [sendingInbox, setSendingInbox] = useState(false);
+
+  const fetchAssignedPatients = React.useCallback(() => {
+    if (!user?.id) return;
+    fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/doctor-patients?doctor_id=${user.id}`)
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === 'success') setAssignedPatients(res.data || []);
+      })
+      .catch(err => console.error("Inbox load error:", err));
+  }, [user?.id]);
+
+  const fetchInboxHistory = React.useCallback(() => {
+    if (!user?.id) return;
+    if (selectedThread === 'admin') {
+      fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/chat/admin-messages?doctor_id=${user.id}`)
+        .then(res => res.json())
+        .then(res => {
+          if (res.status === 'success') {
+            const mapped = (res.messages || []).map((m: any) => ({
+              ...m,
+              sender_id: m.sender === 'doctor' ? user.id : 'admin',
+              sender_name: m.sender === 'doctor' ? `Dr. ${user.name}` : 'PLATFORM ADMINISTRATOR'
+            }));
+            setInboxHistory(mapped);
+          }
+        });
+    } else {
+      fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/chat/history?user_a=${user.id}&user_b=${selectedThread}`)
+        .then(res => res.json())
+        .then(res => {
+          if (res.status === 'success') setInboxHistory(res.messages || []);
+        });
+    }
+  }, [user, selectedThread]);
+
+  useEffect(() => {
+    if (activeTab === 'inbox') {
+      fetchAssignedPatients();
+      fetchInboxHistory();
+      const timer = setInterval(fetchInboxHistory, 6000);
+      return () => clearInterval(timer);
+    }
+  }, [activeTab, selectedThread, fetchInboxHistory, fetchAssignedPatients]);
+
+  const handleSendInbox = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inboxReply.trim() || !user?.id) return;
+    setSendingInbox(true);
+    try {
+      if (selectedThread === 'admin') {
+        await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/chat/send-message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            doctor_id: user.id,
+            sender: 'doctor',
+            sender_name: user.name || 'Doctor',
+            message: inboxReply
+          })
+        });
+      } else {
+        await fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/chat/send-universal`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sender_id: user.id,
+            recipient_id: selectedThread,
+            sender_name: `Dr. ${user.name || 'Physician'}`,
+            sender_role: 'doctor',
+            recipient_role: 'patient',
+            message: inboxReply
+          })
+        });
+      }
+      setInboxReply('');
+      fetchInboxHistory();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSendingInbox(false);
+    }
+  };
 
   useEffect(() => {
     fetch(`${process.env.REACT_APP_API_URL || 'http://' + window.location.hostname + ':5000'}/api/dashboard-data?role=doctor&user_id=${user?.id}`)
@@ -183,11 +273,115 @@ const DoctorDashboard: React.FC = () => {
             )}
           </div>
         </div>
-        <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-full flex items-center gap-3">
-           <div className={`w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]`} />
-           <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest whitespace-nowrap">Live Clinical Sync</span>
+        <div className="flex flex-col gap-3 items-end">
+          <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-full flex items-center gap-3">
+             <div className={`w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]`} />
+             <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest whitespace-nowrap">Live Clinical Sync</span>
+          </div>
+          
+          <div className="flex bg-black/40 rounded-xl p-1 border border-white/10">
+            <button 
+              onClick={() => setActiveTab('overview')}
+              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
+                activeTab === 'overview' 
+                  ? 'bg-orange-600 text-white shadow-[0_0_15px_rgba(234,88,12,0.4)]' 
+                  : 'text-white/40 hover:text-white'
+              }`}
+            >
+              Overview
+            </button>
+            <button 
+              onClick={() => setActiveTab('inbox')}
+              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                activeTab === 'inbox' 
+                  ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]' 
+                  : 'text-white/40 hover:text-white'
+              }`}
+            >
+              <MessageSquare size={16} />
+              Communications Hub
+            </button>
+          </div>
         </div>
       </div>
+
+      {activeTab === 'inbox' && (
+        <section className="bg-[#1e293b]/40 border border-white/5 rounded-[2rem] p-8 shadow-2xl backdrop-blur-sm animate-in fade-in zoom-in-95 duration-500">
+          <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                <MessageCircle className="text-blue-400" />
+                Communications Hub
+              </h2>
+              <p className="text-sm text-white/50 mt-1">Direct channel to platform administrators and patients.</p>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-white/40 uppercase tracking-widest">Active Thread:</span>
+              <select 
+                value={selectedThread}
+                onChange={(e) => setSelectedThread(e.target.value)}
+                className="bg-black/40 border border-blue-500/30 text-white text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-blue-500"
+              >
+                <option value="admin" className="bg-[#0f172a]">🛡️ Platform Admin</option>
+                <optgroup label="Your Patients" className="bg-[#0f172a]">
+                  {assignedPatients.map(p => (
+                    <option key={p.id} value={p.id} className="bg-[#0f172a]">👤 {p.name}</option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+          </div>
+
+          <div className="bg-black/40 border border-white/5 rounded-2xl h-[500px] flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {inboxHistory.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-white/20">
+                  <MessageSquare size={48} className="mb-4 opacity-20" />
+                  <p>No messages in this thread yet.</p>
+                </div>
+              ) : (
+                inboxHistory.map((msg, idx) => {
+                  const isMe = msg.sender_id === user?.id || msg.sender === 'doctor';
+                  return (
+                    <div key={idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                      <span className="text-[10px] text-white/30 mb-1 px-2 uppercase tracking-widest">{msg.sender_name}</span>
+                      <div className={`px-4 py-3 rounded-2xl max-w-[80%] ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white/10 text-white/90 rounded-bl-none'}`}>
+                        {msg.message}
+                      </div>
+                      <span className="text-[9px] text-white/20 mt-1 px-2">
+                        {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="p-4 bg-white/5 border-t border-white/5">
+              <form onSubmit={handleSendInbox} className="flex gap-3">
+                <input
+                  type="text"
+                  value={inboxReply}
+                  onChange={e => setInboxReply(e.target.value)}
+                  placeholder={`Reply to ${selectedThread === 'admin' ? 'Admin' : 'Patient'}...`}
+                  className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 text-white placeholder:text-white/30 focus:outline-none focus:border-blue-500"
+                />
+                <button
+                  type="submit"
+                  disabled={sendingInbox || !inboxReply.trim()}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl font-bold flex items-center gap-2"
+                >
+                  {sendingInbox ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                  Send
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {activeTab === 'overview' && (
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
@@ -293,6 +487,7 @@ const DoctorDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };

@@ -1,8 +1,9 @@
+import os
 import certifi
 import pymongo
 from bson.objectid import ObjectId
 
-client = pymongo.MongoClient("mongodb+srv://ashishking554_db_user:Azziizz%4014@diseasepredictionvalida.dlayq9m.mongodb.net/?appName=DiseasePredictionValidation", tlsCAFile=certifi.where())
+client = pymongo.MongoClient(os.environ.get("MONGO_URI", ""), tlsCAFile=certifi.where())
 db = client["DiseasePredictionValidation"]
 
 user_id = '69e80f3b9d1175f220760881'

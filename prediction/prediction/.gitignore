@@ -4,15 +4,18 @@ jspm_packages/
 venv/
 .venv/
 env/
+
+# ===== SECURITY: NEVER COMMIT THESE =====
 .env
 .env.local
 .env.*.local
 *.env
 *.env.*
+# =========================================
 
 # Python cache and testing
 __pycache__/
-*.py[cod]
+*.py[cod]\
 *$py.class
 .pytest_cache/
 .tox/
@@ -37,3 +40,42 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 *.log
+
+# ===== Deployment utility / scratch scripts (not for production) =====
+prediction/prediction/purge_secrets.py
+prediction/prediction/prepare_deployment.py
+prediction/prediction/safe_refactor.py
+prediction/prediction/fix_patient.py
+prediction/prediction/fix_syntax.py
+prediction/prediction/brute_fix.py
+prediction/prediction/backend/brute_scan.py
+prediction/prediction/backend/debug_*.py
+prediction/prediction/backend/scratch/
+prediction/prediction/backend/scratch_*.py
+prediction/prediction/backend/quick_syntax_validator.py
+prediction/prediction/backend/refactor_*.py
+prediction/prediction/backend/rewrite_*.py
+prediction/prediction/backend/fix_*.py
+prediction/prediction/backend/hoist_*.py
+prediction/prediction/backend/patch_*.py
+prediction/prediction/backend/locate_*.py
+prediction/prediction/backend/find_*.py
+prediction/prediction/backend/list_*.py
+prediction/prediction/backend/trace_*.py
+prediction/prediction/backend/count_*.py
+prediction/prediction/backend/check_*.py
+prediction/prediction/backend/scan_*.py
+prediction/prediction/backend/ultra_scan*.py
+prediction/prediction/backend/short_unsafe_scan.py
+prediction/prediction/backend/strict_unsafe_scan.py
+prediction/prediction/backend/preview_*.py
+prediction/prediction/backend/token_stack_*.py
+prediction/prediction/backend/dump_*.py
+prediction/prediction/backend/hook_*.py
+prediction/prediction/backend/jsx_tag_*.py
+prediction/prediction/backend/portal_*.py
+prediction/prediction/backend/apply_*.py
+prediction/prediction/backend/rebuild_*.py
+prediction/prediction/backend/test_*.py
+prediction/prediction/backend/api_output.json
+prediction/prediction/frontend/src/pages/dashboards/*.bak
